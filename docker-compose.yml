@@ -23,7 +23,7 @@ services:
     build: ./vorpal
     image: archive-ai/vorpal:latest
     environment:
-      - GPU_MEMORY_UTILIZATION=0.22  # ~3.5GB of 16GB
+      - GPU_MEMORY_UTILIZATION=0.50  # ~7.7GB (Goblin disabled, plenty of VRAM)
       - CUDA_VISIBLE_DEVICES=0
     ports:
       - "8000:8000"
@@ -38,13 +38,23 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    command:
+      - "Qwen/Qwen2.5-3B-Instruct"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--gpu-memory-utilization"
+      - "0.50"
+      - "--max-model-len"
+      - "8192"
 
   # 3. Engine B: Capacity (Goblin)
   goblin:
-    image: ghcr.io/ggerganov/llama.cpp:server-cuda
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
-      - MODEL_PATH=/models/model.gguf
-      - N_GPU_LAYERS=38  # Tuned for 10GB limit on 14B models
+      - MODEL_PATH=/models/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf
+      - N_GPU_LAYERS=28  # Reduced to fit with Vorpal + desktop VRAM usage
       - CTX_SIZE=8192
       - HOST=0.0.0.0
       - PORT=8080
@@ -53,7 +63,6 @@ services:
       - "8081:8080"  # Map to 8081 externally (brain uses 8080)
     volumes:
       - ./models/goblin:/models
-      - ./goblin/start.sh:/app/start.sh
     networks:
       - archive-net
     deploy:
@@ -63,7 +72,27 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    command: ["/bin/bash", "/app/start.sh"]
+    command:
+      - "--model"
+      - "/models/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--ctx-size"
+      - "8192"
+      - "--n-gpu-layers"
+      - "28"
+      - "--threads"
+      - "8"
+      - "--batch-size"
+      - "512"
+      - "--ubatch-size"
+      - "512"
+      - "--flash-attn"
+      - "on"
+      - "--cont-batching"
+      - "--metrics"
 
   # 4. The Brain (Orchestrator)
   brain:
