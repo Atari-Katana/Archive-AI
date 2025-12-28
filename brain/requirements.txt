@@ -1,0 +1,23 @@
+# Archive-Brain Dependencies
+# Core orchestrator for Archive-AI
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# HTTP client for engine communication
+requests==2.32.5
+httpx==0.28.1
+
+# Redis client
+redis==7.1.0
+
+# Vector operations and embeddings
+sentence-transformers==3.3.1
+redisvl==0.13.2  # Redis vector library (Phase 5.2, upgraded for numpy handling)
+
+# System monitoring
+psutil==6.1.1
+
+# Future: LangGraph, etc.
+# langgraph==0.2.0

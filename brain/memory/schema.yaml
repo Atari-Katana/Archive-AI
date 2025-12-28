@@ -1,0 +1,48 @@
+# RedisVL Schema for Memory Storage
+# Vector embeddings using sentence-transformers/all-MiniLM-L6-v2 (384 dims)
+
+version: '0.1.0'
+
+index:
+  name: memory_index
+  prefix: memory
+  storage_type: hash
+
+fields:
+  - name: message
+    type: text
+    attrs:
+      sortable: false
+
+  - name: embedding
+    type: vector
+    attrs:
+      dims: 384
+      algorithm: hnsw
+      distance_metric: cosine
+      datatype: float32
+
+  - name: perplexity
+    type: numeric
+    attrs:
+      sortable: true
+
+  - name: surprise_score
+    type: numeric
+    attrs:
+      sortable: true
+
+  - name: timestamp
+    type: numeric
+    attrs:
+      sortable: true
+
+  - name: session_id
+    type: tag
+    attrs:
+      sortable: false
+
+  - name: metadata
+    type: text
+    attrs:
+      sortable: false

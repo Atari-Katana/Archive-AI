@@ -1,0 +1,171 @@
+version: '3.8'
+
+# Production Docker Compose Configuration
+# Archive-AI v7.5 - Optimized for deployment
+
+services:
+  # 1. State Engine (Redis Stack)
+  redis:
+    image: redis/redis-stack:latest
+    container_name: archive-redis
+    environment:
+      - REDIS_ARGS=--maxmemory 20gb --maxmemory-policy allkeys-lru --appendonly yes --protected-mode no --requirepass ${REDIS_PASSWORD:-changeme}
+    ports:
+      - "127.0.0.1:6379:6379"  # Bind to localhost only
+      - "127.0.0.1:8002:8001"  # RedisInsight UI
+    volumes:
+      - ./data/redis:/data
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+    networks:
+      - archive-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 2. Engine A: Speed (Vorpal)
+  vorpal:
+    build: ./vorpal
+    image: archive-ai/vorpal:latest
+    container_name: archive-vorpal
+    environment:
+      - GPU_MEMORY_UTILIZATION=0.22
+      - CUDA_VISIBLE_DEVICES=0
+    ports:
+      - "127.0.0.1:8000:8000"  # Internal only
+    volumes:
+      - ./models/vorpal:/models:ro  # Read-only
+    networks:
+      - archive-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 3. The Brain (Orchestrator)
+  brain:
+    build: ./brain
+    image: archive-ai/brain:latest
+    container_name: archive-brain
+    depends_on:
+      redis:
+        condition: service_healthy
+      vorpal:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - VORPAL_URL=http://vorpal:8000
+      - SANDBOX_URL=http://sandbox:8000
+      - VOICE_URL=http://voice:8001
+      - ASYNC_MEMORY=true
+      - ARCHIVE_ENABLED=true
+      - ARCHIVE_DAYS_THRESHOLD=${ARCHIVE_DAYS:-30}
+      - ARCHIVE_KEEP_RECENT=${ARCHIVE_KEEP:-1000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "${BRAIN_PORT:-8080}:8080"
+    volumes:
+      - ./data/archive:/app/data/archive
+    networks:
+      - archive-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 4. Code Execution Sandbox
+  sandbox:
+    build: ./sandbox
+    image: archive-ai/sandbox:latest
+    container_name: archive-sandbox
+    ports:
+      - "127.0.0.1:8003:8000"  # Internal only
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+
+  # 5. Voice Service
+  voice:
+    build: ./voice
+    image: archive-ai/voice:latest
+    container_name: archive-voice
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - TTS_DEVICE=cpu
+    ports:
+      - "127.0.0.1:8001:8001"  # Internal only
+    volumes:
+      - ./models/whisper:/root/.cache/huggingface:ro
+      - ./models/f5-tts:/models/cache:ro
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+
+  # 6. Librarian Service
+  librarian:
+    build: ./librarian
+    image: archive-ai/librarian:latest
+    container_name: archive-librarian
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - WATCH_DIR=/watch
+    volumes:
+      - ${LIBRARY_DROP:-~/ArchiveAI/Library-Drop}:/watch
+      - ./data/library:/data
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+networks:
+  archive-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Production Notes:
+# 1. Set REDIS_PASSWORD in .env file
+# 2. Configure firewall to block external access to internal ports
+# 3. Use nginx reverse proxy for BRAIN_PORT with SSL
+# 4. Mount volumes with appropriate permissions
+# 5. Backup data/ directory regularly
+# 6. Monitor resource usage with docker stats
+# 7. Review logs with: docker-compose logs -f [service]

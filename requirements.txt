@@ -1,0 +1,11 @@
+# Archive-AI v7.5 Dependencies
+# Core dependencies for testing and development
+
+# Redis client with RedisJSON/RediSearch support
+redis==7.1.0
+
+# HTTP client for API testing
+requests==2.32.5
+
+# Development tools
+flake8==7.3.0

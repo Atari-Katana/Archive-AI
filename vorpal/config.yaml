@@ -1,0 +1,22 @@
+# Vorpal Engine Configuration
+# vLLM-based speed inference engine
+
+# Model configuration
+model: "/models/Llama-3-8B-Instruct-EXL2-4.0bpw"
+tokenizer: "meta-llama/Meta-Llama-3-8B-Instruct"
+
+# GPU memory management (CRITICAL)
+gpu_memory_utilization: 0.22  # ~3.5GB of 16GB total
+max_model_len: 8192
+tensor_parallel_size: 1
+
+# Performance tuning
+dtype: "auto"
+quantization: "exl2"
+max_num_seqs: 256
+max_num_batched_tokens: 8192
+
+# API configuration
+host: "0.0.0.0"
+port: 8000
+disable_log_requests: false

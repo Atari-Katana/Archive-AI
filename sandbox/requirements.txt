@@ -1,0 +1,10 @@
+# Code Sandbox Dependencies
+# Minimal runtime for safe Python code execution
+
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Common libraries for code execution
+requests==2.32.3
+pandas==2.2.3
+numpy==2.2.1

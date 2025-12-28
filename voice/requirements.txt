@@ -1,0 +1,21 @@
+# Archive-Voice Dependencies
+# Faster-Whisper STT + F5-TTS
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# HTTP client (required by faster-whisper)
+requests==2.32.5
+
+# Speech-to-text (Faster-Whisper)
+faster-whisper==1.1.0
+
+# Text-to-speech (F5-TTS)
+f5-tts==1.1.15
+torch>=2.0.0
+torchaudio>=2.0.0
+cached-path>=1.6.2
+
+# File handling
+python-multipart==0.0.18

@@ -1,0 +1,30 @@
+# Librarian Service - Library Ingestion & Processing
+# Archive-AI v7.5 - Phase 5.1 & 5.2
+
+# File watching
+watchdog==4.0.0
+
+# PDF processing
+PyPDF2==3.0.1
+pytesseract==0.3.10
+pdf2image==1.17.0
+Pillow==10.2.0
+
+# Text processing
+tiktoken==0.5.2  # Token counting (OpenAI tokenizer)
+
+# Vector storage (Phase 5.2)
+redisvl==0.13.2  # Redis vector library (upgraded for better numpy handling)
+sentence-transformers==2.3.1  # Embeddings (same as brain)
+redis==5.0.1  # Redis client
+
+# Web framework (for health endpoints)
+fastapi==0.109.0
+uvicorn==0.27.0
+
+# Async support
+asyncio-mqtt==0.16.1
+
+# Utilities
+python-multipart==0.0.6
+aiofiles==23.2.1
