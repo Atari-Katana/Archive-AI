@@ -16,6 +16,8 @@ class Config:
     VOICE_URL = os.getenv("VOICE_URL", "http://voice:8001")
     REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
     BRAIN_URL = "http://localhost:8080"  # Internal brain URL for agents
+    MEMORY_LAST_ID_KEY = os.getenv("MEMORY_LAST_ID_KEY", "memory_worker:last_id")
+    MEMORY_START_FROM_LATEST = os.getenv("MEMORY_START_FROM_LATEST", "true").lower() == "true"
 
     # Feature flags
     ASYNC_MEMORY = os.getenv("ASYNC_MEMORY", "true").lower() == "true"

@@ -1,0 +1,47 @@
+version: '3.8'
+
+# Optional override to run Vorpal with a 7B AWQ model and Goblin with a 7B GGUF.
+# Use with: docker-compose -f docker-compose.yml -f docker-compose.awq-7b.yml up -d vorpal goblin brain
+
+services:
+  vorpal:
+    environment:
+      - GPU_MEMORY_UTILIZATION=0.45  # Aim to keep Vorpal around ~6GB
+    command:
+      - "Qwen/Qwen2.5-7B-Instruct-AWQ"   # AWQ HF repo (download or pre-cache before start)
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--gpu-memory-utilization"
+      - "0.45"
+      - "--max-model-len"
+      - "4096"
+      - "--max-num-seqs"
+      - "64"
+
+  goblin:
+    environment:
+      - MODEL_PATH=/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf
+      - N_GPU_LAYERS=20
+    command:
+      - "--model"
+      - "/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--ctx-size"
+      - "8192"
+      - "--n-gpu-layers"
+      - "20"
+      - "--threads"
+      - "8"
+      - "--batch-size"
+      - "512"
+      - "--ubatch-size"
+      - "512"
+      - "--flash-attn"
+      - "on"
+      - "--cont-batching"
+      - "--metrics"

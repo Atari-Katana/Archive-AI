@@ -10,6 +10,7 @@ import httpx
 import redis.asyncio as redis_async
 from typing import Optional
 import math
+import traceback
 
 from config import config
 from memory.vector_store import VectorStore
@@ -23,13 +24,16 @@ class MemoryWorker:
     # Weights for surprise score calculation
     PERPLEXITY_WEIGHT = 0.6
     VECTOR_DISTANCE_WEIGHT = 0.4
+    # Retry settings for perplexity calls
+    PERPLEXITY_RETRIES = 3
+    PERPLEXITY_RETRY_DELAY = 2.0  # seconds
 
     def __init__(self):
         self.redis_client: Optional[redis_async.Redis] = None
         self.http_client: Optional[httpx.AsyncClient] = None
         self.vector_store: Optional[VectorStore] = None
         self.running = False
-        self.last_id = "0"  # Start from beginning of stream
+        self.last_id: Optional[str] = None  # Populated during connect
 
     async def connect(self):
         """Initialize connections"""
@@ -37,7 +41,16 @@ class MemoryWorker:
             config.REDIS_URL,
             decode_responses=True
         )
-        self.http_client = httpx.AsyncClient(timeout=30.0)
+        # Give Vorpal plenty of time to load on cold start
+        self.http_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(60.0, connect=10.0)
+        )
+
+        # Wait for Vorpal health before starting the worker loop
+        await self.wait_for_vorpal_ready()
+
+        # Load last processed stream ID (or start strategy)
+        await self.load_last_id()
 
         # Initialize vector store (sync operation run in executor)
         self.vector_store = VectorStore(redis_url=config.REDIS_URL)
@@ -63,6 +76,58 @@ class MemoryWorker:
                 self.vector_store.close
             )
 
+    async def load_last_id(self) -> None:
+        """Load last processed stream ID and decide where to start."""
+        if not self.redis_client:
+            self.last_id = "0"
+            return
+
+        saved = await self.redis_client.get(config.MEMORY_LAST_ID_KEY)
+        if saved:
+            self.last_id = saved
+            print(f"[MemoryWorker] Resuming from last_id={self.last_id}")
+        elif config.MEMORY_START_FROM_LATEST:
+            self.last_id = "$"
+            print("[MemoryWorker] Starting from latest stream entry ($)")
+        else:
+            self.last_id = "0"
+            print("[MemoryWorker] Starting from beginning of stream (0)")
+
+    async def wait_for_vorpal_ready(self, timeout: int = 120) -> None:
+        """Wait for Vorpal to be reachable before processing messages."""
+        if not self.http_client:
+            return
+
+        deadline = asyncio.get_event_loop().time() + timeout
+        attempt = 1
+
+        while True:
+            try:
+                response = await self.http_client.get(
+                    f"{config.VORPAL_URL}/health",
+                    timeout=10.0
+                )
+                if response.status_code == 200:
+                    print("[MemoryWorker] Vorpal is ready")
+                    return
+
+                print(
+                    "[MemoryWorker] Vorpal health check failed with status "
+                    f"{response.status_code}"
+                )
+            except Exception as exc:
+                print(
+                    f"[MemoryWorker] Vorpal health check attempt {attempt} failed: "
+                    f"{exc}"
+                )
+
+            if asyncio.get_event_loop().time() >= deadline:
+                print("[MemoryWorker] Vorpal readiness check timed out; continuing anyway")
+                return
+
+            attempt += 1
+            await asyncio.sleep(2.0)
+
     async def calculate_perplexity(self, text: str) -> Optional[float]:
         """
         Calculate perplexity of text using Vorpal.
@@ -73,52 +138,61 @@ class MemoryWorker:
         Returns:
             Perplexity score (lower = more predictable)
         """
-        try:
-            # Request logprobs from Vorpal
-            payload = {
-                "model": "Qwen/Qwen2.5-3B-Instruct",
-                "prompt": text,
-                "max_tokens": 1,  # We just need logprobs, not generation
-                "logprobs": 1,
-                "echo": True  # Return logprobs for input tokens
-            }
+        # Request logprobs from Vorpal
+        payload = {
+            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "prompt": text,
+            "max_tokens": 1,  # We just need logprobs, not generation
+            "logprobs": 1,
+            "echo": True  # Return logprobs for input tokens
+        }
 
-            response = await self.http_client.post(
-                f"{config.VORPAL_URL}/v1/completions",
-                json=payload
-            )
+        for attempt in range(1, self.PERPLEXITY_RETRIES + 1):
+            try:
+                response = await self.http_client.post(
+                    f"{config.VORPAL_URL}/v1/completions",
+                    json=payload
+                )
 
-            if response.status_code != 200:
-                print(f"Vorpal error: {response.status_code}")
-                return None
+                if response.status_code != 200:
+                    print(f"Vorpal error (attempt {attempt}): {response.status_code}")
+                    await asyncio.sleep(self.PERPLEXITY_RETRY_DELAY)
+                    continue
 
-            result = response.json()
+                result = response.json()
 
-            # Extract logprobs from response
-            choices = result.get("choices", [])
-            if not choices:
-                return None
+                # Extract logprobs from response
+                choices = result.get("choices", [])
+                if not choices:
+                    return None
 
-            logprobs_data = choices[0].get("logprobs", {})
-            token_logprobs = logprobs_data.get("token_logprobs", [])
+                logprobs_data = choices[0].get("logprobs", {})
+                token_logprobs = logprobs_data.get("token_logprobs", [])
 
-            if not token_logprobs:
-                return None
+                if not token_logprobs:
+                    return None
 
-            # Calculate perplexity from average log probability
-            # Perplexity = exp(-average_log_prob)
-            valid_logprobs = [lp for lp in token_logprobs if lp is not None]
-            if not valid_logprobs:
-                return None
+                # Calculate perplexity from average log probability
+                # Perplexity = exp(-average_log_prob)
+                valid_logprobs = [lp for lp in token_logprobs if lp is not None]
+                if not valid_logprobs:
+                    return None
 
-            avg_logprob = sum(valid_logprobs) / len(valid_logprobs)
-            perplexity = math.exp(-avg_logprob)
+                avg_logprob = sum(valid_logprobs) / len(valid_logprobs)
+                perplexity = math.exp(-avg_logprob)
 
-            return perplexity
+                return perplexity
 
-        except Exception as e:
-            print(f"Perplexity calculation error: {e}")
-            return None
+            except Exception as e:
+                print(
+                    f"Perplexity calculation error (attempt {attempt}): {e}\n"
+                    f"{traceback.format_exc()}"
+                )
+
+            if attempt < self.PERPLEXITY_RETRIES:
+                await asyncio.sleep(self.PERPLEXITY_RETRY_DELAY)
+
+        return None
 
     async def calculate_vector_distance(self, text: str) -> float:
         """
@@ -271,6 +345,11 @@ class MemoryWorker:
                     for entry_id, entry_data in stream_entries:
                         await self.process_entry(entry_id, entry_data)
                         self.last_id = entry_id
+                        if self.redis_client:
+                            await self.redis_client.set(
+                                config.MEMORY_LAST_ID_KEY,
+                                self.last_id
+                            )
 
             except asyncio.CancelledError:
                 print("[MemoryWorker] Worker cancelled, shutting down...")

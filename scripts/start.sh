@@ -99,6 +99,12 @@ else
     COMPOSE_FILE="docker-compose.yml"
 fi
 
+COMPOSE_FILES="-f $COMPOSE_FILE"
+if [ -n "$EXTRA_COMPOSE_FILE" ]; then
+    print_info "Using extra compose file: $EXTRA_COMPOSE_FILE"
+    COMPOSE_FILES="$COMPOSE_FILES -f $EXTRA_COMPOSE_FILE"
+fi
+
 # Step 1: Pre-flight checks
 print_header "Step 1: Pre-flight Checks"
 
@@ -142,16 +148,16 @@ fi
 # Step 2: Rebuild images (if requested)
 if [ "$REBUILD" = true ]; then
     print_header "Step 2: Rebuilding Docker Images"
-    docker-compose -f "$COMPOSE_FILE" build
+    docker-compose $COMPOSE_FILES build
     print_success "Images rebuilt"
 fi
 
 # Step 3: Stop existing services
 print_header "Step 3: Stopping Existing Services"
 
-if docker-compose -f "$COMPOSE_FILE" ps | grep -q "Up"; then
+if docker-compose $COMPOSE_FILES ps | grep -q "Up"; then
     print_info "Stopping running services..."
-    docker-compose -f "$COMPOSE_FILE" down
+    docker-compose $COMPOSE_FILES down
     print_success "Services stopped"
 else
     print_info "No running services to stop"
@@ -164,7 +170,7 @@ print_info "Starting services..."
 echo ""
 
 if [ "$DETACH" = true ]; then
-    docker-compose -f "$COMPOSE_FILE" up -d
+    docker-compose $COMPOSE_FILES up -d
 
     # Wait for services to start
     sleep 2
@@ -194,14 +200,14 @@ if [ "$DETACH" = true ]; then
 else
     print_warning "Starting in attached mode (logs will stream)"
     print_info "Press Ctrl+C to stop all services"
-    docker-compose -f "$COMPOSE_FILE" up
+    docker-compose $COMPOSE_FILES up
     exit 0
 fi
 
 # Step 5: Service status
 print_header "Step 5: Service Status"
 
-docker-compose -f "$COMPOSE_FILE" ps
+docker-compose $COMPOSE_FILES ps
 
 # Step 6: Health check
 print_header "Step 6: Quick Health Check"
