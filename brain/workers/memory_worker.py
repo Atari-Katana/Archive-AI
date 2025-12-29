@@ -11,9 +11,12 @@ import redis.asyncio as redis_async
 from typing import Optional
 import math
 import traceback
+import logging
 
 from config import config
 from memory.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 
 class MemoryWorker:
@@ -85,13 +88,13 @@ class MemoryWorker:
         saved = await self.redis_client.get(config.MEMORY_LAST_ID_KEY)
         if saved:
             self.last_id = saved
-            print(f"[MemoryWorker] Resuming from last_id={self.last_id}")
+            logger.info("Resuming from last_id=%s", self.last_id)
         elif config.MEMORY_START_FROM_LATEST:
             self.last_id = "$"
-            print("[MemoryWorker] Starting from latest stream entry ($)")
+            logger.info("Starting from latest stream entry ($)")
         else:
             self.last_id = "0"
-            print("[MemoryWorker] Starting from beginning of stream (0)")
+            logger.info("Starting from beginning of stream (0)")
 
     async def wait_for_vorpal_ready(self, timeout: int = 120) -> None:
         """Wait for Vorpal to be reachable before processing messages."""
@@ -108,21 +111,22 @@ class MemoryWorker:
                     timeout=10.0
                 )
                 if response.status_code == 200:
-                    print("[MemoryWorker] Vorpal is ready")
+                    logger.info("Vorpal is ready")
                     return
 
-                print(
-                    "[MemoryWorker] Vorpal health check failed with status "
-                    f"{response.status_code}"
+                logger.warning(
+                    "Vorpal health check failed with status %s",
+                    response.status_code
                 )
             except Exception as exc:
-                print(
-                    f"[MemoryWorker] Vorpal health check attempt {attempt} failed: "
-                    f"{exc}"
+                logger.warning(
+                    "Vorpal health check attempt %s failed: %s",
+                    attempt,
+                    exc
                 )
 
             if asyncio.get_event_loop().time() >= deadline:
-                print("[MemoryWorker] Vorpal readiness check timed out; continuing anyway")
+                logger.warning("Vorpal readiness check timed out; continuing anyway")
                 return
 
             attempt += 1
@@ -155,7 +159,11 @@ class MemoryWorker:
                 )
 
                 if response.status_code != 200:
-                    print(f"Vorpal error (attempt {attempt}): {response.status_code}")
+                    logger.warning(
+                        "Vorpal error (attempt %s): %s",
+                        attempt,
+                        response.status_code
+                    )
                     await asyncio.sleep(self.PERPLEXITY_RETRY_DELAY)
                     continue
 
@@ -184,9 +192,10 @@ class MemoryWorker:
                 return perplexity
 
             except Exception as e:
-                print(
-                    f"Perplexity calculation error (attempt {attempt}): {e}\n"
-                    f"{traceback.format_exc()}"
+                logger.exception(
+                    "Perplexity calculation error (attempt %s): %s",
+                    attempt,
+                    e
                 )
 
             if attempt < self.PERPLEXITY_RETRIES:
@@ -283,8 +292,10 @@ class MemoryWorker:
         # Calculate perplexity
         perplexity = await self.calculate_perplexity(message)
         if perplexity is None:
-            print(f"[MemoryWorker] Failed to calculate perplexity "
-                  f"for: {message[:50]}...")
+            logger.warning(
+                "Failed to calculate perplexity for: %s...",
+                message[:50]
+            )
             return
 
         # Calculate vector distance (novelty)
@@ -297,10 +308,13 @@ class MemoryWorker:
         )
 
         # Log results
-        print(f"[MemoryWorker] Message: {message[:50]}...")
-        print(f"[MemoryWorker] Perplexity: {perplexity:.2f}")
-        print(f"[MemoryWorker] Vector Distance: {vector_distance:.3f}")
-        print(f"[MemoryWorker] Surprise Score: {surprise_score:.3f}")
+        logger.info(
+            "Message: %s... perplexity=%.2f vector_distance=%.3f surprise=%.3f",
+            message[:50],
+            perplexity,
+            vector_distance,
+            surprise_score
+        )
 
         # Store memory if surprising enough
         if surprise_score >= self.SURPRISE_THRESHOLD:
@@ -314,18 +328,16 @@ class MemoryWorker:
                     "default",  # session_id
                     {"timestamp": timestamp, "entry_id": entry_id}
                 )
-                print(f"[MemoryWorker] ✅ STORED (surprise >= {self.SURPRISE_THRESHOLD})")
+                logger.info("Stored memory (surprise >= %s)", self.SURPRISE_THRESHOLD)
             except Exception as e:
-                print(f"[MemoryWorker] Storage error: {e}")
+                logger.exception("Storage error: %s", e)
         else:
-            print(f"[MemoryWorker] ❌ SKIPPED (surprise < {self.SURPRISE_THRESHOLD})")
-
-        print("-" * 60)
+            logger.info("Skipped (surprise < %s)", self.SURPRISE_THRESHOLD)
 
     async def run(self):
         """Main worker loop - reads from stream and processes entries"""
         self.running = True
-        print("[MemoryWorker] Starting background worker...")
+        logger.info("Starting background worker...")
 
         while self.running:
             try:
@@ -352,13 +364,13 @@ class MemoryWorker:
                             )
 
             except asyncio.CancelledError:
-                print("[MemoryWorker] Worker cancelled, shutting down...")
+                logger.info("Worker cancelled, shutting down...")
                 break
             except Exception as e:
-                print(f"[MemoryWorker] Error in worker loop: {e}")
+                logger.exception("Error in worker loop: %s", e)
                 await asyncio.sleep(1)  # Prevent tight error loop
 
-        print("[MemoryWorker] Background worker stopped")
+        logger.info("Background worker stopped")
 
 
 # Global instance

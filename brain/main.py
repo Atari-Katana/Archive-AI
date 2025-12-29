@@ -6,6 +6,8 @@ Orchestrator with async memory worker, Chain of Verification, and ReAct agents.
 import asyncio
 import time
 import httpx
+import logging
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -88,6 +90,24 @@ app.add_middleware(
 worker_task = None
 # Startup time for uptime calculation
 startup_time = time.time()
+
+# Configure logging
+def setup_logging():
+    os.makedirs(config.LOG_DIR, exist_ok=True)
+    logfile = os.path.join(config.LOG_DIR, "brain.log")
+    logging.basicConfig(
+        level=getattr(logging, config.LOG_LEVEL.upper(), logging.INFO),
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(logfile, encoding="utf-8")
+        ],
+        force=True,
+    )
+
+
+setup_logging()
+logger = logging.getLogger("brain")
 
 
 @app.on_event("startup")

@@ -18,6 +18,8 @@ class Config:
     BRAIN_URL = "http://localhost:8080"  # Internal brain URL for agents
     MEMORY_LAST_ID_KEY = os.getenv("MEMORY_LAST_ID_KEY", "memory_worker:last_id")
     MEMORY_START_FROM_LATEST = os.getenv("MEMORY_START_FROM_LATEST", "true").lower() == "true"
+    LOG_DIR = os.getenv("LOG_DIR", "logs")
+    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
     # Feature flags
     ASYNC_MEMORY = os.getenv("ASYNC_MEMORY", "true").lower() == "true"
