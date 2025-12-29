@@ -28,7 +28,7 @@ class Config:
     REQUEST_TIMEOUT = 30  # seconds
 
     # Model names
-    VORPAL_MODEL = "Qwen/Qwen2.5-3B-Instruct"  # Scout model for chat/routing
+    VORPAL_MODEL = os.getenv("VORPAL_MODEL", "Qwen/Qwen2.5-3B-Instruct")
 
     # Redis settings
     REDIS_STREAM_KEY = "session:input_stream"

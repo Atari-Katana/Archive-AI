@@ -373,6 +373,7 @@ async def health():
     return {
         "status": "healthy",
         "vorpal_url": config.VORPAL_URL,
+        "vorpal_model": config.VORPAL_MODEL,
         "async_memory": memory_status
     }
 

@@ -103,6 +103,7 @@ services:
       - vorpal
     environment:
       - REDIS_URL=redis://redis:6379
+      - VORPAL_MODEL=Qwen/Qwen2.5-3B-Instruct
       - VORPAL_URL=http://vorpal:8000
       - GOBLIN_URL=http://goblin:8080
       - SANDBOX_URL=http://sandbox:8000

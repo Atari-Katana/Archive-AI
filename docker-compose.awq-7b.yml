@@ -6,6 +6,7 @@ version: '3.8'
 services:
   vorpal:
     environment:
+      - VORPAL_MODEL=Qwen/Qwen2.5-7B-Instruct-AWQ
       - GPU_MEMORY_UTILIZATION=0.45  # Aim to keep Vorpal around ~6GB
     command:
       - "Qwen/Qwen2.5-7B-Instruct-AWQ"   # AWQ HF repo (download or pre-cache before start)
