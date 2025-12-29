@@ -11,6 +11,8 @@
 
 set -e  # Exit on error
 
+USER_CONFIG_FILE=${USER_CONFIG_FILE:-config/user-config.env}
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -107,6 +109,16 @@ fi
 
 # Step 1: Pre-flight checks
 print_header "Step 1: Pre-flight Checks"
+
+# Load user overrides if present
+if [ -f "$USER_CONFIG_FILE" ]; then
+    print_info "Loading user config from $USER_CONFIG_FILE"
+    set -a
+    source "$USER_CONFIG_FILE"
+    set +a
+else
+    print_info "User config not found ($USER_CONFIG_FILE); using defaults/env"
+fi
 
 # Check if .env exists
 if [ ! -f .env ]; then
