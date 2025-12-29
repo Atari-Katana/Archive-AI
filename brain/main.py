@@ -566,7 +566,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         # Proxy request to Vorpal (vLLM OpenAI-compatible API)
         async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
             vorpal_payload = {
-                "model": "Qwen/Qwen2.5-3B-Instruct",
+                "model": config.VORPAL_MODEL,
                 "prompt": request.message,
                 "max_tokens": 256,
                 "temperature": 0.7

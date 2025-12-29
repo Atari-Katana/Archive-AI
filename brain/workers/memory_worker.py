@@ -69,7 +69,7 @@ class MemoryWorker:
         if self.redis_client:
             await self.redis_client.close()
         if self.http_client:
-            await self.http_client.close()
+            await self.http_client.aclose()
         if self.vector_store:
             await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -140,7 +140,7 @@ class MemoryWorker:
         """
         # Request logprobs from Vorpal
         payload = {
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "model": config.VORPAL_MODEL,
             "prompt": text,
             "max_tokens": 1,  # We just need logprobs, not generation
             "logprobs": 1,

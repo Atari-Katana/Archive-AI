@@ -57,7 +57,7 @@ class ChainOfVerification:
             Initial response text
         """
         payload = {
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "model": config.VORPAL_MODEL,
             "prompt": prompt,
             "max_tokens": 256,
             "temperature": 0.7
@@ -100,11 +100,11 @@ Generate verification questions that:
 2. Can be answered with yes/no or brief facts
 3. Would reveal errors if the original answer was wrong
 
-Format: One question per line, numbered.
-Verification questions:"""
+        Format: One question per line, numbered.
+        Verification questions:"""
 
         payload = {
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "model": config.VORPAL_MODEL,
             "prompt": verification_prompt,
             "max_tokens": 150,
             "temperature": 0.3  # Lower temp for more focused questions
@@ -143,7 +143,7 @@ Verification questions:"""
             Answer to the verification question
         """
         payload = {
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "model": config.VORPAL_MODEL,
             "prompt": question,
             "max_tokens": 100,
             "temperature": 0.3
@@ -192,7 +192,7 @@ Verification Results:
 Provide the final answer (corrected if needed):"""
 
         payload = {
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "model": config.VORPAL_MODEL,
             "prompt": revision_prompt,
             "max_tokens": 300,
             "temperature": 0.5

@@ -190,7 +190,7 @@ Question: {question}
             LLM response with Thought/Action/Action Input
         """
         payload = {
-            "model": "Qwen/Qwen2.5-3B-Instruct",
+            "model": config.VORPAL_MODEL,
             "prompt": prompt,
             "max_tokens": 256,
             "temperature": 0.7,
