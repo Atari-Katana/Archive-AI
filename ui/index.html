@@ -3,1169 +3,895 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Archive-AI - Intelligent Agent Interface</title>
+    <title>Archive-AI | ClaraGPT Console</title>
     <style>
+        :root {
+            --oak-dark: #3a2315;
+            --oak-base: #5a3922;
+            --oak-warm: #7b4d2b;
+            --oak-glow: #a66a3a;
+            --brass: #b08b4a;
+            --brass-dark: #7a5a2a;
+            --brass-light: #d2b377;
+            --ink: #22160f;
+            --parchment: #f2e6d3;
+            --dust: rgba(242, 230, 211, 0.18);
+            --shadow: rgba(17, 10, 6, 0.45);
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        html,
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
+            height: 100%;
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 20px;
-            height: calc(100vh - 40px);
-        }
-
-        .main-panel {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 24px;
-            text-align: center;
-        }
-
-        .header h1 {
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .header p {
-            opacity: 0.9;
-            font-size: 14px;
-        }
-
-        .chat-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 24px;
-            background: #f8f9fa;
-        }
-
-        .message {
-            margin-bottom: 16px;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .message-user {
-            text-align: right;
-        }
-
-        .message-content {
-            display: inline-block;
-            padding: 12px 18px;
-            border-radius: 18px;
-            max-width: 70%;
-            word-wrap: break-word;
-        }
-
-        .message-user .message-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .message-agent .message-content {
-            background: white;
-            border: 1px solid #e0e0e0;
-            color: #333;
-        }
-
-        .message-system .message-content {
-            background: #f0f0f0;
-            color: #666;
-            font-size: 13px;
-            font-style: italic;
-        }
-
-        .reasoning-steps {
-            margin-top: 12px;
-            padding: 12px;
-            background: #f0f0f0;
-            border-radius: 8px;
-            font-size: 13px;
-            max-width: 70%;
-        }
-
-        .trace-summary {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            padding: 8px;
-            background: white;
-            border-radius: 6px;
-            font-size: 12px;
-        }
-
-        .trace-stat {
-            text-align: center;
-        }
-
-        .trace-stat-value {
-            font-size: 18px;
-            font-weight: 600;
-            color: #667eea;
-        }
-
-        .trace-stat-label {
-            font-size: 10px;
-            color: #666;
-            text-transform: uppercase;
-        }
-
-        .step {
-            padding: 8px;
-            margin: 4px 0;
-            background: white;
-            border-left: 3px solid #667eea;
-            border-radius: 4px;
-            transition: all 0.3s;
-        }
-
-        .step:hover {
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .step.collapsed .step-content {
-            display: none;
-        }
-
-        .step-header {
-            font-weight: 600;
-            color: #667eea;
-            margin-bottom: 4px;
-            cursor: pointer;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            user-select: none;
-        }
-
-        .step-header:hover {
-            color: #764ba2;
-        }
-
-        .step-toggle {
-            font-size: 12px;
-            color: #999;
-        }
-
-        .step-status {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            margin-left: 8px;
-            font-size: 10px;
-            line-height: 16px;
-            text-align: center;
-        }
-
-        .step-status.success {
-            background: #4caf50;
-            color: white;
-        }
-
-        .step-status.error {
-            background: #f44336;
-            color: white;
-        }
-
-        .step-content {
-            margin-top: 8px;
-        }
-
-        .step-detail {
-            margin: 4px 0;
-        }
-
-        .step-label {
-            font-weight: 600;
-        }
-
-        .step-detail.long-text {
-            max-height: 100px;
-            overflow: hidden;
+        body {
+            min-height: 100%;
+            height: 100%;
+            font-family: "Cinzel", "Garamond", "Palatino Linotype", serif;
+            color: var(--parchment);
+            background:
+                radial-gradient(circle at top left, rgba(174, 126, 71, 0.22), transparent 60%),
+                radial-gradient(circle at 20% 90%, rgba(96, 62, 35, 0.45), transparent 55%),
+                linear-gradient(135deg, var(--oak-dark), var(--oak-base) 45%, var(--oak-warm));
             position: relative;
+            overflow-x: hidden;
+            overflow-y: hidden;
         }
 
-        .step-detail.long-text.expanded {
-            max-height: none;
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                repeating-linear-gradient(
+                    110deg,
+                    rgba(20, 12, 8, 0.18) 0px,
+                    rgba(20, 12, 8, 0.18) 2px,
+                    rgba(255, 255, 255, 0.03) 2px,
+                    rgba(255, 255, 255, 0.03) 6px
+                ),
+                repeating-linear-gradient(
+                    14deg,
+                    rgba(0, 0, 0, 0.22) 0px,
+                    rgba(0, 0, 0, 0.22) 1px,
+                    rgba(255, 255, 255, 0.02) 1px,
+                    rgba(255, 255, 255, 0.02) 5px
+                );
+            opacity: 0.45;
+            pointer-events: none;
+            mix-blend-mode: multiply;
         }
 
-        .expand-btn {
-            color: #667eea;
-            cursor: pointer;
-            font-size: 11px;
-            text-decoration: underline;
-            margin-top: 4px;
-            display: inline-block;
-        }
-
-        .expand-btn:hover {
-            color: #764ba2;
-        }
-
-        .tool-badge {
-            display: inline-block;
-            padding: 2px 8px;
-            background: #764ba2;
-            color: white;
-            border-radius: 12px;
-            font-size: 11px;
-            margin-left: 8px;
-        }
-
-        .input-container {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #e0e0e0;
-        }
-
-        .input-wrapper {
-            display: flex;
-            gap: 12px;
-        }
-
-        .input-box {
-            flex: 1;
-            padding: 14px 18px;
-            border: 2px solid #e0e0e0;
-            border-radius: 24px;
-            font-size: 15px;
-            outline: none;
-            transition: border-color 0.3s;
-        }
-
-        .input-box:focus {
-            border-color: #667eea;
-        }
-
-        .send-btn, .action-btn {
-            padding: 14px 32px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 24px;
-            font-size: 15px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-
-        .send-btn:hover:not(:disabled),
-        .action-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .mode-btn:hover:not(.active) {
-            background: #f0f0f0;
-        }
-
-        .send-btn:disabled {
+        body::after {
+            content: "";
+            position: fixed;
+            inset: -30% -10% 0 -10%;
+            background: radial-gradient(circle at top, rgba(255, 232, 199, 0.16), transparent 55%);
             opacity: 0.6;
-            cursor: not-allowed;
+            pointer-events: none;
         }
 
-        .sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            max-height: calc(100vh - 40px);
-            overflow-y: auto;
-            padding-right: 10px;
+        @keyframes panelRise {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(0.98);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes cardRise {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes dustFloat {
+            0% {
+                opacity: 0.6;
+                transform: translateY(0);
+            }
+            50% {
+                opacity: 0.85;
+                transform: translateY(-6px);
+            }
+            100% {
+                opacity: 0.6;
+                transform: translateY(0);
+            }
+        }
+
+        .app-shell {
+            max-width: 1500px;
+            margin: 0 auto;
+            padding: 24px 22px 32px;
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+            grid-template-rows: minmax(0, 1fr);
+            gap: 28px;
+            height: 100%;
+            align-items: stretch;
         }
 
         .panel {
-            background: white;
-            border-radius: 16px;
-            padding: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-        }
-
-        .panel h2 {
-            font-size: 18px;
-            margin-bottom: 16px;
-            color: #333;
-        }
-
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .status-item:last-child {
-            border-bottom: none;
-        }
-
-        .status-label {
-            color: #666;
-            font-size: 13px;
-        }
-
-        .status-value {
-            font-weight: 600;
-            color: #333;
-            font-size: 13px;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            margin-right: 6px;
-            background: #4caf50;
-        }
-
-        .mode-selector {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-
-        .mode-btn {
-            padding: 10px;
-            border: 2px solid #e0e0e0;
-            background: white;
-            border-radius: 8px;
-            font-size: 13px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .mode-btn.active {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-color: #667eea;
-        }
-
-        .tool-usage {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 12px;
-            min-height: 30px;
-        }
-
-        .tool-chip {
-            padding: 4px 12px;
-            background: #e8eaf6;
-            color: #667eea;
-            border-radius: 16px;
-            font-size: 12px;
-            font-weight: 500;
+            background:
+                linear-gradient(180deg, rgba(60, 38, 22, 0.92), rgba(46, 28, 16, 0.94)),
+                radial-gradient(circle at top, rgba(174, 130, 70, 0.3), transparent 60%);
+            border: 1px solid rgba(210, 179, 119, 0.35);
+            border-radius: 18px;
+            box-shadow: 0 25px 60px var(--shadow);
             position: relative;
-            transition: all 0.3s;
+            overflow: hidden;
+            animation: panelRise 0.9s ease both;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
-        .tool-chip:hover {
-            background: #667eea;
-            color: white;
-            transform: translateY(-2px);
+        .panel:nth-child(2) {
+            animation-delay: 0.12s;
         }
 
-        .tool-count {
-            display: inline-block;
-            background: #764ba2;
-            color: white;
-            border-radius: 50%;
+        .panel::before,
+        .panel::after {
+            content: "";
+            position: absolute;
             width: 18px;
             height: 18px;
-            line-height: 18px;
-            text-align: center;
-            font-size: 10px;
-            margin-left: 6px;
+            background: radial-gradient(circle, var(--brass-light), var(--brass-dark));
+            border-radius: 50%;
+            box-shadow: 0 0 12px rgba(208, 178, 118, 0.35);
+        }
+
+        .panel::before {
+            top: 16px;
+            left: 18px;
+        }
+
+        .panel::after {
+            top: 16px;
+            right: 18px;
+        }
+
+        .panel-inner {
+            padding: 22px 24px 28px;
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            overflow-y: auto;
+            min-height: 0;
+        }
+
+        .panel-inner::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(120deg, rgba(255, 255, 255, 0.04), transparent 40%);
+            pointer-events: none;
+        }
+
+        header {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        header h1 {
+            font-size: 30px;
+            letter-spacing: 1px;
             font-weight: 600;
         }
 
-        .action-btn {
-            width: 100%;
-            margin-bottom: 8px;
-            padding: 10px;
+        header p {
+            font-size: 13px;
+            font-family: "Cormorant Garamond", "Garamond", serif;
+            color: rgba(242, 230, 211, 0.82);
+        }
+
+        .bridge-status {
+            margin-top: 8px;
+            font-size: 12px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            color: rgba(210, 179, 119, 0.85);
+        }
+
+        .hero-art {
+            border: 2px solid rgba(210, 179, 119, 0.6);
+            border-radius: 16px;
+            padding: 18px;
+            background:
+                linear-gradient(180deg, rgba(36, 22, 12, 0.9), rgba(59, 37, 21, 0.85)),
+                radial-gradient(circle at top, rgba(208, 178, 118, 0.18), transparent 65%);
+            position: relative;
+            margin-bottom: 18px;
+            box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.35);
+        }
+
+        .hero-art::before,
+        .hero-art::after {
+            content: "";
+            position: absolute;
+            width: 52px;
+            height: 52px;
+            background: url("assets/filigree-corner.svg") center/contain no-repeat;
+            opacity: 0.9;
+        }
+
+        .hero-art::before {
+            top: 10px;
+            left: 10px;
+        }
+
+        .hero-art::after {
+            bottom: 10px;
+            right: 10px;
+            transform: rotate(180deg);
+        }
+
+        .hero-canvas {
+            --art-image: url("assets/art-placeholder.svg");
+            height: 160px;
+            border-radius: 12px;
+            background:
+                linear-gradient(135deg, rgba(208, 178, 118, 0.12), transparent 60%),
+                var(--art-image),
+                repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0px, rgba(255, 255, 255, 0.04) 6px, transparent 6px, transparent 12px);
+            background-position: center, center, center;
+            background-size: cover, cover, auto;
+            background-repeat: no-repeat;
+            background-blend-mode: screen, normal, overlay;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: rgba(242, 230, 211, 0.75);
+            font-size: 13px;
+            padding: 0 24px;
+        }
+
+        .hero-canvas.has-art {
+            color: rgba(242, 230, 211, 0.6);
+        }
+
+        .hero-canvas.is-dragover {
+            outline: 2px dashed rgba(210, 179, 119, 0.7);
+            outline-offset: 4px;
+        }
+
+        .hero-placeholder {
+            max-width: 420px;
+        }
+
+        .hero-actions {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .hero-button {
+            min-width: 120px;
+        }
+
+        .hero-note {
+            font-size: 10px;
+            color: rgba(242, 230, 211, 0.65);
+            font-family: "Cormorant Garamond", "Garamond", serif;
+        }
+
+        .hero-art input[type="file"] {
+            display: none;
+        }
+
+        .section-title {
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 12px;
+            margin: 16px 0 10px;
+            color: rgba(210, 179, 119, 0.8);
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 14px;
+        }
+
+        .button-card {
+            background: linear-gradient(160deg, rgba(90, 57, 34, 0.95), rgba(60, 36, 20, 0.95));
+            border: 1px solid rgba(210, 179, 119, 0.4);
+            border-radius: 14px;
+            padding: 12px 12px;
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.35);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            position: relative;
+            animation: cardRise 0.6s ease both;
+            animation-delay: var(--delay, 0s);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .button-card::after {
+            content: "";
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: url("assets/brass-medallion.svg") center/contain no-repeat;
+            top: 10px;
+            right: 12px;
+            opacity: 0.7;
+        }
+
+        .button-card:hover {
+            transform: translateY(-2px);
+            box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.35), 0 8px 18px rgba(19, 10, 6, 0.35);
+        }
+
+        .button-label {
+            font-size: 14px;
+            color: var(--parchment);
+            letter-spacing: 0.5px;
+        }
+
+        .button-desc {
+            font-size: 11px;
+            font-family: "Cormorant Garamond", "Garamond", serif;
+            color: rgba(242, 230, 211, 0.75);
+        }
+
+        .button-action {
+            margin-top: 6px;
+            background: linear-gradient(120deg, rgba(210, 179, 119, 0.2), rgba(110, 80, 40, 0.25));
+            border: 1px solid rgba(210, 179, 119, 0.6);
+            color: var(--parchment);
+            padding: 6px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+        }
+
+        .button-action:hover {
+            background: linear-gradient(120deg, rgba(210, 179, 119, 0.4), rgba(110, 80, 40, 0.35));
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(24, 14, 8, 0.4);
+        }
+
+        .input-card {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .input-card input {
+            background: rgba(24, 14, 8, 0.65);
+            border: 1px solid rgba(210, 179, 119, 0.6);
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: var(--parchment);
             font-size: 13px;
         }
 
-        .health-grid {
+        .input-card input::placeholder {
+            color: rgba(242, 230, 211, 0.6);
+        }
+
+        .status-panel {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 10px;
-            margin-bottom: 12px;
+            margin-top: 14px;
         }
 
-        .health-metric {
+        .status-chip {
+            background: rgba(34, 22, 15, 0.65);
+            border: 1px solid rgba(210, 179, 119, 0.35);
+            border-radius: 12px;
             padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            text-align: center;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
         }
 
-        .health-metric-label {
+        .status-chip span {
+            color: rgba(242, 230, 211, 0.7);
+            font-size: 10px;
+        }
+
+        .status-light {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .light-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(210, 179, 119, 0.9), rgba(90, 62, 30, 0.8));
+            box-shadow: 0 0 8px rgba(208, 178, 118, 0.45);
+        }
+
+        .manual-list,
+        .hidden-list {
+            display: grid;
+            gap: 12px;
+        }
+
+        .manual-entry,
+        .hidden-entry {
+            background: rgba(36, 22, 12, 0.7);
+            border: 1px solid rgba(210, 179, 119, 0.35);
+            border-radius: 12px;
+            padding: 12px 14px;
             font-size: 11px;
-            color: #666;
+            line-height: 1.4;
+        }
+
+        .manual-entry strong,
+        .hidden-entry strong {
+            display: block;
+            font-size: 12px;
+            color: var(--parchment);
             margin-bottom: 4px;
         }
 
-        .health-metric-value {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .health-metric-unit {
+        .principles {
+            margin-top: 20px;
+            padding: 14px 16px;
+            border-left: 2px solid rgba(210, 179, 119, 0.7);
+            background: rgba(34, 22, 15, 0.5);
             font-size: 11px;
-            color: #999;
-            margin-left: 2px;
+            line-height: 1.5;
         }
 
-        .service-health {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #f0f0f0;
+        .dust-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at top right, rgba(255, 233, 201, 0.16), transparent 55%),
+                radial-gradient(circle at 30% 60%, rgba(255, 233, 201, 0.08), transparent 55%);
+            pointer-events: none;
+            opacity: 0.7;
+            mix-blend-mode: screen;
+            animation: dustFloat 18s ease-in-out infinite;
         }
 
-        .service-health:last-child {
-            border-bottom: none;
+        .button-card:nth-child(1) { --delay: 0.05s; }
+        .button-card:nth-child(2) { --delay: 0.08s; }
+        .button-card:nth-child(3) { --delay: 0.11s; }
+        .button-card:nth-child(4) { --delay: 0.14s; }
+        .button-card:nth-child(5) { --delay: 0.17s; }
+        .button-card:nth-child(6) { --delay: 0.2s; }
+        .button-card:nth-child(7) { --delay: 0.23s; }
+        .button-card:nth-child(8) { --delay: 0.26s; }
+        .button-card:nth-child(9) { --delay: 0.29s; }
+        .button-card:nth-child(10) { --delay: 0.32s; }
+        .button-card:nth-child(11) { --delay: 0.35s; }
+        .button-card:nth-child(12) { --delay: 0.38s; }
+        .button-card:nth-child(13) { --delay: 0.41s; }
+        .button-card:nth-child(14) { --delay: 0.44s; }
+        .button-card:nth-child(15) { --delay: 0.47s; }
+        .button-card:nth-child(16) { --delay: 0.5s; }
+        .button-card:nth-child(17) { --delay: 0.53s; }
+        .button-card:nth-child(18) { --delay: 0.56s; }
+
+        @media (max-width: 1100px) {
+            html,
+            body {
+                height: auto;
+            }
+
+            body {
+                overflow-y: auto;
+            }
+
+            .app-shell {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto;
+                height: auto;
+            }
+
+            .panel {
+                height: auto;
+            }
+
+            .panel-inner {
+                overflow-y: visible;
+            }
         }
 
-        .service-name {
-            font-size: 13px;
-            color: #333;
-        }
+        @media (max-width: 720px) {
+            .app-shell {
+                padding: 20px 16px 32px;
+            }
 
-        .health-badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-        }
+            header h1 {
+                font-size: 25px;
+            }
 
-        .health-badge.healthy {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
+            .hero-canvas {
+                height: 140px;
+            }
 
-        .health-badge.degraded {
-            background: #fff3e0;
-            color: #f57c00;
-        }
+            .hero-actions {
+                flex-direction: column;
+                align-items: flex-start;
+            }
 
-        .health-badge.unhealthy {
-            background: #ffebee;
-            color: #c62828;
-        }
-
-        .health-badge.unknown {
-            background: #f5f5f5;
-            color: #757575;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: #e0e0e0;
-            border-radius: 3px;
-            overflow: hidden;
-            margin-top: 4px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
-            transition: width 0.3s;
-        }
-
-        @media (max-width: 1024px) {
-            .container {
+            .button-grid {
                 grid-template-columns: 1fr;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="main-panel">
-            <div class="header">
-                <h1>Archive-AI</h1>
-                <p>Intelligent Agent with Reasoning & Tool Use</p>
-            </div>
+    <div class="app-shell">
+        <section class="panel">
+            <div class="panel-inner">
+                <header>
+                    <h1>Archive-AI Cabinet</h1>
+                    <p>ClaraGPT command interface dressed in oak, brass, and a deliberate hush of dust.</p>
+                    <div class="bridge-status" data-status>Bridge idle.</div>
+                </header>
 
-            <div class="chat-container" id="chatContainer">
-                <div class="message message-system">
-                    <div class="message-content">
-                        Welcome to Archive-AI! I can help with calculations, data analysis, time queries, and more. Try asking me something!
-                    </div>
-                </div>
-            </div>
-
-            <div class="input-container">
-                <div class="mode-selector">
-                    <button class="mode-btn active" data-mode="chat">Chat</button>
-                    <button class="mode-btn" data-mode="verify">Verified</button>
-                    <button class="mode-btn" data-mode="agent">Basic Agent</button>
-                    <button class="mode-btn" data-mode="advanced">Advanced</button>
-                </div>
-                <div class="input-wrapper">
-                    <input type="text" class="input-box" id="userInput" placeholder="Type your message...">
-                    <button class="send-btn" id="sendBtn">Send</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="sidebar">
-            <div class="panel">
-                <h2>System Status</h2>
-                <div class="status-item">
-                    <span class="status-label">Brain API</span>
-                    <span class="status-value">
-                        <span class="status-indicator"></span>
-                        <span id="apiStatus">Online</span>
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">LLM Model</span>
-                    <span class="status-value">Qwen 2.5-3B</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Available Tools</span>
-                    <span class="status-value">11 tools</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Mode</span>
-                    <span class="status-value" id="currentMode">Chat</span>
-                </div>
-            </div>
-
-            <div class="panel">
-                <h2>System Health</h2>
-                <div class="health-grid">
-                    <div class="health-metric">
-                        <div class="health-metric-label">Uptime</div>
-                        <div class="health-metric-value" id="uptimeValue">--</div>
-                    </div>
-                    <div class="health-metric">
-                        <div class="health-metric-label">Memories</div>
-                        <div class="health-metric-value" id="memoriesValue">--</div>
-                    </div>
-                    <div class="health-metric">
-                        <div class="health-metric-label">CPU</div>
-                        <div class="health-metric-value">
-                            <span id="cpuValue">--</span><span class="health-metric-unit">%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="cpuProgress" style="width: 0%"></div>
+                <div class="hero-art" aria-label="Custom art area">
+                    <div class="hero-canvas" id="hero-canvas" role="img" aria-label="Custom art canvas">
+                        <div class="hero-placeholder">
+                            Global custom art panel. Drop in your painted crest, machine diagram, or archive mural here.
                         </div>
                     </div>
-                    <div class="health-metric">
-                        <div class="health-metric-label">Memory</div>
-                        <div class="health-metric-value">
-                            <span id="memoryValue">--</span><span class="health-metric-unit">%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" id="memoryProgress" style="width: 0%"></div>
-                        </div>
+                    <div class="hero-actions">
+                        <button class="button-action hero-button" data-command="load_custom_art" id="art-load">Load Art</button>
+                        <div class="hero-note">Accepts PNG, JPG, or SVG. Stored locally.</div>
+                    </div>
+                    <input type="file" id="art-input" accept="image/*,image/svg+xml" aria-label="Load custom art" />
+                </div>
+
+                <div class="section-title">Command Buttons</div>
+                <div class="button-grid">
+                    <div class="button-card">
+                        <div class="button-label">Voice Input Toggle</div>
+                        <div class="button-desc">Start or stop speech-to-text listening.</div>
+                        <button class="button-action" data-command="voice_input_toggle">Engage</button>
+                    </div>
+                    <div class="button-card input-card">
+                        <div class="button-label">Manual Text Input Field</div>
+                        <div class="button-desc">Type a question or command directly.</div>
+                        <input type="text" id="manual-input" placeholder="Type a request for ClaraGPT" aria-label="Manual text input" />
+                        <button class="button-action" data-command="manual_text_input" id="manual-submit">Submit</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Transcript Drawer</div>
+                        <div class="button-desc">Show full conversation history.</div>
+                        <button class="button-action" data-command="transcript_drawer">Unseal</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Memory Log Panel</div>
+                        <div class="button-desc">View logged memories and notes (stored by Sir Godfrey).</div>
+                        <button class="button-action" data-command="memory_log_panel">Inspect</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Context Snapshot Button</div>
+                        <div class="button-desc">View the current active memory/session context.</div>
+                        <button class="button-action" data-command="context_snapshot_button">Reveal</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">The Library Tab</div>
+                        <div class="button-desc">Open Lady Julia's media view (files, documents, stored data).</div>
+                        <button class="button-action" data-command="library_tab">Open</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Web Search Button</div>
+                        <div class="button-desc">Trigger a web search via DuckDuckGo or custom engine.</div>
+                        <button class="button-action" data-command="web_search_button">Search</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Reminder Button</div>
+                        <div class="button-desc">Add, view, or cancel reminders.</div>
+                        <button class="button-action" data-command="reminder_button">Set</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Calendar View</div>
+                        <div class="button-desc">Access scheduled items, events, tasks.</div>
+                        <button class="button-action" data-command="calendar_view">Consult</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Command Console / Terminal</div>
+                        <div class="button-desc">Open a Dev-style interface to inspect system tools or type prompts.</div>
+                        <button class="button-action" data-command="command_console">Enter</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Style Panel (Theme)</div>
+                        <div class="button-desc">Toggle Clara's personality tone (formal, playful, poetic).</div>
+                        <button class="button-action" data-command="style_panel">Shift</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Settings / Config</div>
+                        <div class="button-desc">Load Clara config (TOML), CPU limits, fallback toggles.</div>
+                        <button class="button-action" data-command="settings_config">Adjust</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Privacy Control Panel</div>
+                        <div class="button-desc">View active connections, memory boundaries, local-only status.</div>
+                        <button class="button-action" data-command="privacy_control_panel">Verify</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Inter-Agent Comms Panel</div>
+                        <div class="button-desc">Talk with Desktop Clara, Miss Herringwood, or Darcy.</div>
+                        <button class="button-action" data-command="inter_agent_comms_panel">Link</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Fallback Mode Toggle</div>
+                        <div class="button-desc">Force Clara into fallback (rule-based, low-cognition) mode.</div>
+                        <button class="button-action" data-command="fallback_mode_toggle">Switch</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Save Context Now</div>
+                        <div class="button-desc">Snapshot current memory context to cold storage.</div>
+                        <button class="button-action" data-command="save_context_now">Archive</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Silent Mode Button</div>
+                        <div class="button-desc">Mute all voice output (keep logs and processing on).</div>
+                        <button class="button-action" data-command="silent_mode_button">Mute</button>
+                    </div>
+                    <div class="button-card">
+                        <div class="button-label">Restart Agent Session</div>
+                        <div class="button-desc">Begin fresh context and optionally archive current state.</div>
+                        <button class="button-action" data-command="restart_agent_session">Restart</button>
                     </div>
                 </div>
-                <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 8px;">
-                    <div style="font-size: 12px; color: #666; margin-bottom: 8px; font-weight: 600;">Services</div>
-                    <div id="servicesHealth">
-                        <div class="service-health">
-                            <span class="service-name">Loading...</span>
+
+                <div class="section-title">Status Lights</div>
+                <div class="status-panel">
+                    <div class="status-chip">
+                        <div class="status-light">
+                            <div class="light-dot"></div>
+                            CPU Mode
                         </div>
+                        <span>Normal / Fallback</span>
+                    </div>
+                    <div class="status-chip">
+                        <div class="status-light">
+                            <div class="light-dot"></div>
+                            Memory Heat
+                        </div>
+                        <span>Hot / Warm / Cold</span>
+                    </div>
+                    <div class="status-chip">
+                        <div class="status-light">
+                            <div class="light-dot"></div>
+                            Voice Output
+                        </div>
+                        <span>Active / Silent</span>
                     </div>
                 </div>
             </div>
+            <div class="dust-overlay"></div>
+        </section>
 
-            <div class="panel">
-                <h2>Recent Tools</h2>
-                <div class="tool-usage" id="toolUsage">
-                    <span class="tool-chip">No tools used</span>
-                </div>
-            </div>
-
-            <div class="panel">
-                <h2>Quick Actions</h2>
-                <button class="action-btn" id="timeBtn">Get Current Time</button>
-                <button class="action-btn" id="calcBtn">Quick Calculation</button>
-                <button class="action-btn" id="clearBtn">Clear Chat</button>
-            </div>
-
-            <div class="panel" style="max-height: 400px; display: flex; flex-direction: column;">
-                <h2>Memory Browser</h2>
-                <div style="margin-bottom: 12px;">
-                    <input type="text" id="memorySearch" placeholder="Search memories..."
-                           style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px;">
-                </div>
-                <div style="margin-bottom: 8px; font-size: 12px; color: #666;">
-                    <span id="memoryCount">0 memories</span>
-                </div>
-                <div id="memoryList" style="flex: 1; overflow-y: auto; font-size: 13px;">
-                    <div style="text-align: center; padding: 20px; color: #999;">
-                        Loading memories...
+        <aside class="panel">
+            <div class="panel-inner">
+                <div class="section-title">Asset Manual</div>
+                <div class="manual-list">
+                    <div class="manual-entry">
+                        <strong>Global Art Panel</strong>
+                        Replace `--art-image` on `.hero-canvas` or swap `assets/art-placeholder.svg` with your crest.
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Art Loader</strong>
+                        Use the Load Art button and `#art-input` to preview local PNG, JPG, or SVG files.
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Button Medallions</strong>
+                        Update `.button-card::after` or replace `assets/brass-medallion.svg` for custom seals.
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Brass Filigree Corners</strong>
+                        Replace `assets/filigree-corner.svg` or adjust `.hero-art::before` styling.
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Oak Grain Texture</strong>
+                        Update `body::before` gradients to change grain density, direction, or stain depth.
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Dust Patina</strong>
+                        Tune `.dust-overlay` opacity for a cleaner polish or heavier antique haze.
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Status Lights</strong>
+                        Color-shift `.light-dot` for live telemetry (green, amber, or crimson).
+                    </div>
+                    <div class="manual-entry">
+                        <strong>Divider Engravings</strong>
+                        Add inline SVGs above `.section-title` if you want etched brass separators.
                     </div>
                 </div>
+
+                <div class="section-title">Hidden Triggers</div>
+                <div class="hidden-list">
+                    <div class="hidden-entry">
+                        <strong>Context Blending Toggle</strong>
+                        Merge session with stored memory; expose via dropdown or gesture.
+                    </div>
+                    <div class="hidden-entry">
+                        <strong>Clara Prime <-> Desktop Relay</strong>
+                        Bridge messaging between primary and desktop agents.
+                    </div>
+                    <div class="hidden-entry">
+                        <strong>Log-Level Selection</strong>
+                        Info, Debug, or Private visibility control.
+                    </div>
+                    <div class="hidden-entry">
+                        <strong>Agent Status Light</strong>
+                        Reflect CPU mode and memory temperature at a glance.
+                    </div>
+                    <div class="hidden-entry">
+                        <strong>Audio Device Selector</strong>
+                        Choose microphone and output routing.
+                    </div>
+                    <div class="hidden-entry">
+                        <strong>Voice Style Override</strong>
+                        Formal, affectionate, dry, or silent voice modes.
+                    </div>
+                    <div class="hidden-entry">
+                        <strong>Model Override</strong>
+                        Select Phi-3, LLaMA, or local model variants.
+                    </div>
+                </div>
+
+                <div class="principles">
+                    <strong>Principles:</strong> one action per control, minimum friction, and visible feedback via waveform, transcript, or cameo animation.
+                </div>
             </div>
-        </div>
+            <div class="dust-overlay"></div>
+        </aside>
     </div>
-
     <script>
-        const API_BASE = 'http://localhost:8080';
-        let currentMode = 'chat';
-        let toolUsageStats = {}; // Track tool usage counts
+        (() => {
+            const statusLine = document.querySelector("[data-status]");
+            const artCanvas = document.getElementById("hero-canvas");
+            const artInput = document.getElementById("art-input");
+            const artLoad = document.getElementById("art-load");
+            const manualInput = document.getElementById("manual-input");
+            const manualSubmit = document.getElementById("manual-submit");
 
-        // DOM elements
-        const chatContainer = document.getElementById('chatContainer');
-        const userInput = document.getElementById('userInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const toolUsageDiv = document.getElementById('toolUsage');
-        const modeBtns = document.querySelectorAll('.mode-btn');
+            const tauri = window.__TAURI__ || null;
+            const invoke = tauri && tauri.invoke ? tauri.invoke : null;
 
-        // Mode selection
-        modeBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                currentMode = btn.dataset.mode;
-                modeBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                const modeNames = {
-                    'chat': 'Chat',
-                    'verify': 'Verified',
-                    'agent': 'Basic Agent',
-                    'advanced': 'Advanced'
-                };
-                document.getElementById('currentMode').textContent = modeNames[currentMode];
-            });
-        });
-
-        // Input handlers
-        userInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-        sendBtn.addEventListener('click', sendMessage);
-
-        // Quick actions
-        document.getElementById('timeBtn').addEventListener('click', () => {
-            userInput.value = 'What is the current date and time?';
-            sendMessage();
-        });
-
-        document.getElementById('calcBtn').addEventListener('click', () => {
-            userInput.value = 'Calculate 123 * 456';
-            sendMessage();
-        });
-
-        document.getElementById('clearBtn').addEventListener('click', () => {
-            chatContainer.textContent = '';
-            const sysMsg = createMessage('Chat cleared. Start a new conversation!', 'system');
-            chatContainer.appendChild(sysMsg);
-
-            // Reset tool usage stats
-            toolUsageStats = {};
-            toolUsageDiv.textContent = '';
-            const chip = document.createElement('span');
-            chip.className = 'tool-chip';
-            chip.textContent = 'No tools used';
-            toolUsageDiv.appendChild(chip);
-        });
-
-        function createMessage(content, type) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = `message message-${type}`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = content;
-            
-            msgDiv.appendChild(contentDiv);
-            return msgDiv;
-        }
-
-        function createAgentMessage(response, data) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'message message-agent';
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = response;
-            msgDiv.appendChild(contentDiv);
-
-            if (data.steps && data.steps.length > 0) {
-                const stepsDiv = document.createElement('div');
-                stepsDiv.className = 'reasoning-steps';
-
-                // Add summary statistics
-                const summaryDiv = document.createElement('div');
-                summaryDiv.className = 'trace-summary';
-
-                const toolsUsed = new Set();
-                let successCount = 0;
-                data.steps.forEach(step => {
-                    if (step.action && step.action !== 'Final Answer') {
-                        toolsUsed.add(step.action);
-                    }
-                    if (step.observation && !step.observation.toLowerCase().includes('error')) {
-                        successCount++;
-                    }
-                });
-
-                // Total steps stat
-                const totalStat = document.createElement('div');
-                totalStat.className = 'trace-stat';
-                totalStat.innerHTML = `<div class="trace-stat-value">${data.steps.length}</div><div class="trace-stat-label">Steps</div>`;
-                summaryDiv.appendChild(totalStat);
-
-                // Tools used stat
-                const toolsStat = document.createElement('div');
-                toolsStat.className = 'trace-stat';
-                toolsStat.innerHTML = `<div class="trace-stat-value">${toolsUsed.size}</div><div class="trace-stat-label">Tools</div>`;
-                summaryDiv.appendChild(toolsStat);
-
-                // Success rate stat
-                const successRate = Math.round((successCount / data.steps.length) * 100);
-                const successStat = document.createElement('div');
-                successStat.className = 'trace-stat';
-                successStat.innerHTML = `<div class="trace-stat-value">${successRate}%</div><div class="trace-stat-label">Success</div>`;
-                summaryDiv.appendChild(successStat);
-
-                stepsDiv.appendChild(summaryDiv);
-
-                const title = document.createElement('strong');
-                title.textContent = 'Reasoning Process:';
-                stepsDiv.appendChild(title);
-
-                data.steps.forEach((step, index) => {
-                    const stepDiv = document.createElement('div');
-                    stepDiv.className = 'step';
-
-                    // Determine step success/error status
-                    const hasError = step.observation && step.observation.toLowerCase().includes('error');
-                    const statusClass = hasError ? 'error' : 'success';
-                    const statusIcon = hasError ? '✕' : '✓';
-
-                    const header = document.createElement('div');
-                    header.className = 'step-header';
-
-                    const headerText = document.createElement('span');
-                    headerText.textContent = `Step ${step.step_number}`;
-
-                    const headerRight = document.createElement('span');
-
-                    const statusSpan = document.createElement('span');
-                    statusSpan.className = `step-status ${statusClass}`;
-                    statusSpan.textContent = statusIcon;
-
-                    const toggleSpan = document.createElement('span');
-                    toggleSpan.className = 'step-toggle';
-                    toggleSpan.textContent = '▼';
-
-                    headerRight.appendChild(statusSpan);
-                    headerRight.appendChild(toggleSpan);
-
-                    header.appendChild(headerText);
-                    header.appendChild(headerRight);
-
-                    // Toggle collapse on click
-                    header.addEventListener('click', () => {
-                        stepDiv.classList.toggle('collapsed');
-                        toggleSpan.textContent = stepDiv.classList.contains('collapsed') ? '▶' : '▼';
-                    });
-
-                    stepDiv.appendChild(header);
-
-                    // Create content container
-                    const contentDiv = document.createElement('div');
-                    contentDiv.className = 'step-content';
-
-                    const thought = document.createElement('div');
-                    thought.className = 'step-detail';
-                    const thoughtLabel = document.createElement('span');
-                    thoughtLabel.className = 'step-label';
-                    thoughtLabel.textContent = 'Thought: ';
-                    thought.appendChild(thoughtLabel);
-                    thought.appendChild(document.createTextNode(step.thought));
-
-                    // Handle long text
-                    if (step.thought.length > 200) {
-                        thought.classList.add('long-text');
-                        const expandBtn = document.createElement('span');
-                        expandBtn.className = 'expand-btn';
-                        expandBtn.textContent = 'Show more';
-                        expandBtn.addEventListener('click', (e) => {
-                            e.stopPropagation();
-                            thought.classList.toggle('expanded');
-                            expandBtn.textContent = thought.classList.contains('expanded') ? 'Show less' : 'Show more';
-                        });
-                        thought.appendChild(document.createElement('br'));
-                        thought.appendChild(expandBtn);
-                    }
-
-                    contentDiv.appendChild(thought);
-
-                    if (step.action && step.action !== 'Final Answer') {
-                        const action = document.createElement('div');
-                        action.className = 'step-detail';
-                        const actionLabel = document.createElement('span');
-                        actionLabel.className = 'step-label';
-                        actionLabel.textContent = 'Action: ';
-                        action.appendChild(actionLabel);
-                        action.appendChild(document.createTextNode(step.action));
-
-                        const badge = document.createElement('span');
-                        badge.className = 'tool-badge';
-                        badge.textContent = step.action;
-                        action.appendChild(badge);
-
-                        contentDiv.appendChild(action);
-                    }
-
-                    if (step.action_input) {
-                        const input = document.createElement('div');
-                        input.className = 'step-detail';
-                        const inputLabel = document.createElement('span');
-                        inputLabel.className = 'step-label';
-                        inputLabel.textContent = 'Input: ';
-                        input.appendChild(inputLabel);
-                        input.appendChild(document.createTextNode(step.action_input));
-                        contentDiv.appendChild(input);
-                    }
-
-                    if (step.observation) {
-                        const obs = document.createElement('div');
-                        obs.className = 'step-detail';
-                        const obsLabel = document.createElement('span');
-                        obsLabel.className = 'step-label';
-                        obsLabel.textContent = 'Result: ';
-                        obs.appendChild(obsLabel);
-                        obs.appendChild(document.createTextNode(step.observation));
-
-                        // Handle long results
-                        if (step.observation.length > 200) {
-                            obs.classList.add('long-text');
-                            const expandBtn = document.createElement('span');
-                            expandBtn.className = 'expand-btn';
-                            expandBtn.textContent = 'Show more';
-                            expandBtn.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                obs.classList.toggle('expanded');
-                                expandBtn.textContent = obs.classList.contains('expanded') ? 'Show less' : 'Show more';
-                            });
-                            obs.appendChild(document.createElement('br'));
-                            obs.appendChild(expandBtn);
-                        }
-
-                        contentDiv.appendChild(obs);
-                    }
-
-                    stepDiv.appendChild(contentDiv);
-                    stepsDiv.appendChild(stepDiv);
-                });
-
-                msgDiv.appendChild(stepsDiv);
-
-                if (toolsUsed.size > 0) {
-                    updateToolUsage(Array.from(toolsUsed));
+            const setStatus = (text) => {
+                if (statusLine) {
+                    statusLine.textContent = text;
                 }
-            }
+            };
 
-            return msgDiv;
-        }
+            const dispatch = (action, payload) => {
+                if (!action) {
+                    return Promise.resolve();
+                }
 
-        function updateToolUsage(tools) {
-            // Update stats
-            tools.forEach(tool => {
-                toolUsageStats[tool] = (toolUsageStats[tool] || 0) + 1;
-            });
+                if (invoke) {
+                    setStatus("Dispatching " + action + "...");
+                    return invoke("ui_action", { action, payload })
+                        .then((message) => setStatus(message))
+                        .catch((error) => setStatus("Error: " + error));
+                }
 
-            // Clear and rebuild display
-            toolUsageDiv.textContent = '';
+                setStatus("Preview: " + action);
+                return Promise.resolve();
+            };
 
-            // Sort by usage count (descending)
-            const sortedTools = Object.entries(toolUsageStats)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10); // Show top 10
-
-            if (sortedTools.length === 0) {
-                const chip = document.createElement('span');
-                chip.className = 'tool-chip';
-                chip.textContent = 'No tools used';
-                toolUsageDiv.appendChild(chip);
+            if (invoke) {
+                setStatus("Tauri bridge ready.");
             } else {
-                sortedTools.forEach(([tool, count]) => {
-                    const chip = document.createElement('span');
-                    chip.className = 'tool-chip';
-                    chip.textContent = tool;
-
-                    if (count > 1) {
-                        const countBadge = document.createElement('span');
-                        countBadge.className = 'tool-count';
-                        countBadge.textContent = count;
-                        chip.appendChild(countBadge);
-                    }
-
-                    toolUsageDiv.appendChild(chip);
-                });
+                setStatus("Preview mode: Tauri bridge not detected.");
             }
-        }
 
-        async function sendMessage() {
-            const message = userInput.value.trim();
-            if (!message) return;
-
-            chatContainer.appendChild(createMessage(message, 'user'));
-            userInput.value = '';
-
-            sendBtn.disabled = true;
-            sendBtn.textContent = 'Thinking...';
-
-            try {
-                let endpoint, payload;
-                switch(currentMode) {
-                    case 'chat':
-                        endpoint = '/chat';
-                        payload = { message };
-                        break;
-                    case 'verify':
-                        endpoint = '/verify';
-                        payload = { message };
-                        break;
-                    case 'agent':
-                        endpoint = '/agent';
-                        payload = { question: message, max_steps: 10 };
-                        break;
-                    case 'advanced':
-                        endpoint = '/agent/advanced';
-                        payload = { question: message, max_steps: 10 };
-                        break;
+            document.querySelectorAll("[data-command]").forEach((button) => {
+                if (button.id === "art-load" || button.id === "manual-submit") {
+                    return;
                 }
-
-                const response = await fetch(API_BASE + endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                const data = await response.json();
-
-                if (currentMode === 'chat') {
-                    chatContainer.appendChild(createMessage(data.response, 'agent'));
-                } else if (currentMode === 'verify') {
-                    chatContainer.appendChild(createMessage(data.final_response, 'agent'));
-                } else {
-                    chatContainer.appendChild(createAgentMessage(data.answer || 'Task completed!', data));
-                }
-
-            } catch (error) {
-                chatContainer.appendChild(createMessage('Error: ' + error.message, 'system'));
-            }
-
-            sendBtn.disabled = false;
-            sendBtn.textContent = 'Send';
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            userInput.focus();
-        }
-
-        // Memory Browser functionality
-        const memoryListDiv = document.getElementById('memoryList');
-        const memoryCountSpan = document.getElementById('memoryCount');
-        const memorySearchInput = document.getElementById('memorySearch');
-        let allMemories = [];
-
-        async function loadMemories() {
-            try {
-                const response = await fetch(`${API_BASE}/memories?limit=50`);
-                const data = await response.json();
-                allMemories = data.memories;
-                memoryCountSpan.textContent = `${data.total} memories (showing ${data.memories.length})`;
-                displayMemories(allMemories);
-            } catch (error) {
-                memoryListDiv.innerHTML = `<div style="text-align: center; padding: 20px; color: #f44336;">Error loading memories</div>`;
-            }
-        }
-
-        async function searchMemories(query) {
-            if (!query || query.trim() === '') {
-                displayMemories(allMemories);
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/memories/search`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query: query, top_k: 10 })
-                });
-                const data = await response.json();
-                memoryCountSpan.textContent = `${data.total} results`;
-                displayMemories(data.memories);
-            } catch (error) {
-                memoryListDiv.innerHTML = `<div style="text-align: center; padding: 20px; color: #f44336;">Search error</div>`;
-            }
-        }
-
-        function displayMemories(memories) {
-            memoryListDiv.innerHTML = '';
-
-            if (memories.length === 0) {
-                memoryListDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">No memories found</div>';
-                return;
-            }
-
-            memories.forEach(mem => {
-                const memDiv = document.createElement('div');
-                memDiv.style.cssText = 'padding: 10px; margin-bottom: 8px; background: #f8f9fa; border-radius: 8px; border-left: 3px solid #667eea; cursor: pointer; transition: background 0.2s;';
-                memDiv.addEventListener('mouseenter', () => memDiv.style.background = '#e8e9ea');
-                memDiv.addEventListener('mouseleave', () => memDiv.style.background = '#f8f9fa');
-
-                const messageDiv = document.createElement('div');
-                messageDiv.style.cssText = 'font-size: 13px; color: #333; margin-bottom: 6px; line-height: 1.4;';
-                messageDiv.textContent = mem.message.length > 100 ? mem.message.substring(0, 100) + '...' : mem.message;
-
-                const metaDiv = document.createElement('div');
-                metaDiv.style.cssText = 'font-size: 11px; color: #666; display: flex; justify-content: space-between;';
-
-                const dateSpan = document.createElement('span');
-                const date = new Date(mem.timestamp * 1000);
-                dateSpan.textContent = date.toLocaleString();
-
-                const scoreSpan = document.createElement('span');
-                scoreSpan.textContent = `Score: ${mem.surprise_score.toFixed(3)}`;
-
-                if (mem.similarity_score !== null && mem.similarity_score !== undefined) {
-                    const simSpan = document.createElement('span');
-                    simSpan.textContent = `Sim: ${mem.similarity_score.toFixed(3)}`;
-                    simSpan.style.cssText = 'color: #667eea; font-weight: 600;';
-                    metaDiv.appendChild(simSpan);
-                }
-
-                metaDiv.appendChild(dateSpan);
-                metaDiv.appendChild(scoreSpan);
-
-                memDiv.appendChild(messageDiv);
-                memDiv.appendChild(metaDiv);
-
-                memDiv.addEventListener('click', () => {
-                    alert(`Memory Details:\n\nMessage: ${mem.message}\n\nPerplexity: ${mem.perplexity.toFixed(2)}\nSurprise Score: ${mem.surprise_score.toFixed(3)}\nTimestamp: ${new Date(mem.timestamp * 1000).toLocaleString()}\nSession: ${mem.session_id}\nID: ${mem.id}`);
-                });
-
-                memoryListDiv.appendChild(memDiv);
+                button.addEventListener("click", () => dispatch(button.dataset.command));
             });
-        }
 
-        // Memory search handler
-        let searchTimeout;
-        memorySearchInput.addEventListener('input', (e) => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                searchMemories(e.target.value);
-            }, 500);
-        });
+            if (manualInput && manualSubmit) {
+                const sendManual = () => {
+                    const value = manualInput.value.trim();
+                    if (!value) {
+                        setStatus("Manual input empty.");
+                        return;
+                    }
+                    dispatch("manual_text_input", value);
+                };
 
-        // Load memories on page load
-        loadMemories();
-
-        // Health Dashboard functionality
-        async function loadHealthMetrics() {
-            try {
-                const response = await fetch(`${API_BASE}/metrics`);
-                const data = await response.json();
-
-                // Update uptime
-                const uptimeSeconds = data.uptime_seconds;
-                const hours = Math.floor(uptimeSeconds / 3600);
-                const minutes = Math.floor((uptimeSeconds % 3600) / 60);
-                const seconds = Math.floor(uptimeSeconds % 60);
-
-                let uptimeText;
-                if (hours > 0) {
-                    uptimeText = `${hours}h ${minutes}m`;
-                } else if (minutes > 0) {
-                    uptimeText = `${minutes}m ${seconds}s`;
-                } else {
-                    uptimeText = `${seconds}s`;
-                }
-                document.getElementById('uptimeValue').textContent = uptimeText;
-
-                // Update memories count
-                document.getElementById('memoriesValue').textContent = data.memory_stats.total_memories;
-
-                // Update CPU and Memory if available
-                if (data.system) {
-                    const cpu = data.system.cpu_percent.toFixed(1);
-                    document.getElementById('cpuValue').textContent = cpu;
-                    document.getElementById('cpuProgress').style.width = `${cpu}%`;
-
-                    const memory = data.system.memory_percent.toFixed(1);
-                    document.getElementById('memoryValue').textContent = memory;
-                    document.getElementById('memoryProgress').style.width = `${memory}%`;
-                } else {
-                    document.getElementById('cpuValue').textContent = 'N/A';
-                    document.getElementById('memoryValue').textContent = 'N/A';
-                }
-
-                // Update service statuses
-                const servicesDiv = document.getElementById('servicesHealth');
-                servicesDiv.innerHTML = '';
-
-                data.services.forEach(service => {
-                    const serviceDiv = document.createElement('div');
-                    serviceDiv.className = 'service-health';
-
-                    const nameSpan = document.createElement('span');
-                    nameSpan.className = 'service-name';
-                    nameSpan.textContent = service.name;
-
-                    const badgeSpan = document.createElement('span');
-                    badgeSpan.className = `health-badge ${service.status}`;
-                    badgeSpan.textContent = service.status.charAt(0).toUpperCase() + service.status.slice(1);
-
-                    serviceDiv.appendChild(nameSpan);
-                    serviceDiv.appendChild(badgeSpan);
-                    servicesDiv.appendChild(serviceDiv);
+                manualInput.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter") {
+                        sendManual();
+                    }
                 });
 
-            } catch (error) {
-                console.error('Error loading health metrics:', error);
-                document.getElementById('uptimeValue').textContent = 'Error';
+                manualSubmit.addEventListener("click", sendManual);
             }
-        }
 
-        // Load health metrics on page load
-        loadHealthMetrics();
+            let currentArtUrl = null;
 
-        // Auto-refresh health metrics every 5 seconds
-        setInterval(loadHealthMetrics, 5000);
+            const setArt = (file) => {
+                if (!file) {
+                    return;
+                }
+                if (!artCanvas) {
+                    return;
+                }
 
-        userInput.focus();
+                if (currentArtUrl) {
+                    URL.revokeObjectURL(currentArtUrl);
+                }
+
+                currentArtUrl = URL.createObjectURL(file);
+                artCanvas.style.setProperty("--art-image", "url('" + currentArtUrl + "')");
+                artCanvas.classList.add("has-art");
+
+                const fileName = file.name || "Custom Art";
+                const placeholder = artCanvas.querySelector(".hero-placeholder");
+                if (placeholder) {
+                    placeholder.textContent = "Loaded: " + fileName;
+                }
+
+                dispatch("load_custom_art", fileName);
+            };
+
+            if (artLoad && artInput) {
+                artLoad.addEventListener("click", (event) => {
+                    event.preventDefault();
+                    artInput.click();
+                });
+
+                artInput.addEventListener("change", (event) => {
+                    const file = event.target.files && event.target.files[0];
+                    setArt(file);
+                });
+            }
+
+            if (artCanvas) {
+                artCanvas.addEventListener("dragover", (event) => {
+                    event.preventDefault();
+                    artCanvas.classList.add("is-dragover");
+                });
+
+                artCanvas.addEventListener("dragleave", () => {
+                    artCanvas.classList.remove("is-dragover");
+                });
+
+                artCanvas.addEventListener("drop", (event) => {
+                    event.preventDefault();
+                    artCanvas.classList.remove("is-dragover");
+                    const file = event.dataTransfer.files && event.dataTransfer.files[0];
+                    setArt(file);
+                });
+            }
+        })();
     </script>
 </body>
 </html>

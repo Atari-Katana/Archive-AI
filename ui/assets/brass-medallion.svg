@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="0.3" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#e2c48a"/>
+      <stop offset="0.6" stop-color="#b08b4a"/>
+      <stop offset="1" stop-color="#6a4b22"/>
+    </radialGradient>
+  </defs>
+  <circle cx="18" cy="18" r="15" fill="url(#glow)" stroke="#4b3316" stroke-width="1"/>
+  <circle cx="18" cy="18" r="10" fill="none" stroke="#f0d8a8" stroke-width="1.2"/>
+  <path d="M18 6 L19.5 10 L18 14 L16.5 10 Z" fill="#f0d8a8"/>
+  <path d="M18 22 L19.5 26 L18 30 L16.5 26 Z" fill="#f0d8a8"/>
+  <path d="M6 18 L10 19.5 L14 18 L10 16.5 Z" fill="#f0d8a8"/>
+  <path d="M22 18 L26 19.5 L30 18 L26 16.5 Z" fill="#f0d8a8"/>
+</svg>
