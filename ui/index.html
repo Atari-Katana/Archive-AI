@@ -794,7 +794,8 @@
 
                 if (invoke) {
                     setStatus("Dispatching " + action + "...");
-                    return invoke("ui_action", { action, payload })
+                    const args = payload !== undefined ? { payload } : {};
+                    return invoke(action, args)
                         .then((message) => setStatus(message))
                         .catch((error) => setStatus("Error: " + error));
                 }
