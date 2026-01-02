@@ -23,7 +23,7 @@ services:
     build: ./vorpal
     image: archive-ai/vorpal:latest
     environment:
-      - GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.50}  # ~7.7GB (Goblin disabled, plenty of VRAM)
+      - GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.60}  # ~9.6GB (Goblin on CPU now)
       - CUDA_VISIBLE_DEVICES=0
     ports:
       - "8000:8000"
@@ -45,20 +45,19 @@ services:
       - "--port"
       - "8000"
       - "--gpu-memory-utilization"
-      - "${VORPAL_GPU_MEMORY_UTILIZATION:-0.50}"
+      - "${VORPAL_GPU_MEMORY_UTILIZATION:-0.60}"
       - "--max-model-len"
       - "${VORPAL_MAX_MODEL_LEN:-8192}"
 
-  # 3. Engine B: Capacity (Goblin)
+  # 3. Engine B: Capacity (Goblin) - CPU-only for reasoning/coding
   goblin:
-    image: ghcr.io/ggml-org/llama.cpp:server-cuda
+    image: ghcr.io/ggml-org/llama.cpp:server  # CPU-only version
     environment:
       - MODEL_PATH=${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf}
-      - N_GPU_LAYERS=${GOBLIN_N_GPU_LAYERS:-28}  # Reduced to fit with Vorpal + desktop VRAM usage
+      - N_GPU_LAYERS=0  # CPU-only (no GPU layers)
       - CTX_SIZE=${GOBLIN_CTX_SIZE:-8192}
       - HOST=0.0.0.0
       - PORT=8080
-      - CUDA_VISIBLE_DEVICES=0
     ports:
       - "8081:8080"  # Map to 8081 externally (brain uses 8080)
     volumes:
@@ -67,11 +66,8 @@ services:
       - archive-net
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+        limits:
+          memory: 8G  # Limit to 8GB RAM
     command:
       - "--model"
       - "${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-14B-Q4_K_M.gguf}"
@@ -82,15 +78,13 @@ services:
       - "--ctx-size"
       - "${GOBLIN_CTX_SIZE:-8192}"
       - "--n-gpu-layers"
-      - "${GOBLIN_N_GPU_LAYERS:-28}"
+      - "0"
       - "--threads"
-      - "${GOBLIN_THREADS:-8}"
+      - "${GOBLIN_THREADS:-16}"  # Increased for CPU performance
       - "--batch-size"
       - "${GOBLIN_BATCH_SIZE:-512}"
       - "--ubatch-size"
       - "${GOBLIN_UBATCH_SIZE:-512}"
-      - "--flash-attn"
-      - "on"
       - "--cont-batching"
       - "--metrics"
 
@@ -109,10 +103,18 @@ services:
       - SANDBOX_URL=http://sandbox:8000
       - VOICE_URL=http://voice:8001
       - ASYNC_MEMORY=true  # Enabled in Chunk 2.3
+      - NVIDIA_VISIBLE_DEVICES=0  # Access for monitoring only
     ports:
       - "8080:8080"
     networks:
       - archive-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [utility]  # utility capability for nvidia-smi
 
   # 4.5. Code Execution Sandbox
   sandbox:

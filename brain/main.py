@@ -24,6 +24,7 @@ from workers.memory_worker import memory_worker
 from verification import ChainOfVerification
 from agents import ReActAgent, ToolRegistry, AgentStep, get_basic_tools, get_advanced_tools
 from memory.vector_store import vector_store
+from router import SemanticRouter, Intent
 
 
 app = FastAPI(
@@ -78,10 +79,11 @@ chain-of-verification, ReAct agents, and memory management.
 )
 
 # Configure CORS to allow browser access from web UI
+# Note: For production, restrict allow_origins to specific domains
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8888", "http://127.0.0.1:8888"],
-    allow_credentials=True,
+    allow_origins=["*"],  # Allow all origins for local development
+    allow_credentials=False,  # Must be False when using wildcard origins
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -90,6 +92,8 @@ app.add_middleware(
 worker_task = None
 # Startup time for uptime calculation
 startup_time = time.time()
+# Semantic router for intent classification
+semantic_router = SemanticRouter()
 
 # Configure logging
 def setup_logging():
@@ -325,6 +329,10 @@ class SystemMetrics(BaseModel):
     memory_percent: Optional[float] = None
     memory_used_mb: Optional[float] = None
     memory_total_mb: Optional[float] = None
+    gpu_memory_used_mb: Optional[float] = None
+    gpu_memory_total_mb: Optional[float] = None
+    gpu_memory_percent: Optional[float] = None
+    tokens_per_sec: Optional[float] = None
 
 
 class MemoryStats(BaseModel):
@@ -398,6 +406,65 @@ async def health():
     }
 
 
+async def get_gpu_metrics() -> tuple[Optional[float], Optional[float], Optional[float]]:
+    """
+    Get GPU memory usage using nvidia-smi.
+    Returns: (used_mb, total_mb, percent)
+    """
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader,nounits'],
+            capture_output=True,
+            text=True,
+            timeout=2.0
+        )
+        if result.returncode == 0:
+            used, total = result.stdout.strip().split(',')
+            used_mb = float(used.strip())
+            total_mb = float(total.strip())
+            percent = (used_mb / total_mb) * 100 if total_mb > 0 else 0
+            return (used_mb, total_mb, percent)
+    except Exception:
+        pass
+    return (None, None, None)
+
+
+async def get_tokens_per_sec() -> Optional[float]:
+    """
+    Calculate tokens/sec from Vorpal metrics.
+    Uses inter-token latency from vLLM metrics.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=2.0) as client:
+            response = await client.get(f"{config.VORPAL_URL}/metrics")
+            if response.status_code != 200:
+                return None
+
+            # Parse Prometheus metrics for inter-token latency
+            metrics_text = response.text
+            for line in metrics_text.split('\n'):
+                if line.startswith('vllm:inter_token_latency_seconds_sum'):
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        total_latency = float(parts[-1])
+                        # Also get count
+                        for count_line in metrics_text.split('\n'):
+                            if count_line.startswith('vllm:inter_token_latency_seconds_count'):
+                                count_parts = count_line.split()
+                                if len(count_parts) >= 2:
+                                    count = float(count_parts[-1])
+                                    if count > 0 and total_latency > 0:
+                                        # tokens/sec = 1 / avg_latency
+                                        avg_latency = total_latency / count
+                                        tokens_per_sec = 1.0 / avg_latency if avg_latency > 0 else 0
+                                        return round(tokens_per_sec, 1)
+                        break
+    except Exception:
+        pass
+    return None
+
+
 @app.get("/metrics", response_model=MetricsResponse, tags=["health"])
 async def get_metrics() -> MetricsResponse:
     """
@@ -447,11 +514,22 @@ async def get_metrics() -> MetricsResponse:
         try:
             cpu_percent = psutil.cpu_percent(interval=0.1)
             memory = psutil.virtual_memory()
+
+            # Get GPU metrics
+            gpu_used, gpu_total, gpu_percent = await get_gpu_metrics()
+
+            # Get tokens/sec
+            tokens_per_sec = await get_tokens_per_sec()
+
             system_metrics = SystemMetrics(
                 cpu_percent=cpu_percent,
                 memory_percent=memory.percent,
                 memory_used_mb=memory.used / (1024 * 1024),
-                memory_total_mb=memory.total / (1024 * 1024)
+                memory_total_mb=memory.total / (1024 * 1024),
+                gpu_memory_used_mb=gpu_used,
+                gpu_memory_total_mb=gpu_total,
+                gpu_memory_percent=gpu_percent,
+                tokens_per_sec=tokens_per_sec
             )
         except Exception:
             pass  # If psutil fails, just skip system metrics
@@ -549,9 +627,14 @@ async def get_metrics() -> MetricsResponse:
 @app.post("/chat", response_model=ChatResponse, tags=["core"])
 async def chat(request: ChatRequest) -> ChatResponse:
     """
-    Direct LLM conversation
+    Direct LLM conversation with semantic routing
 
-    Send a message to the Vorpal engine (Qwen 2.5-3B) and receive a response.
+    Send a message and receive a response. The system intelligently routes your
+    message based on intent:
+    - **Memory Search**: Queries like "what did I say about..." automatically search memories
+    - **Help**: Questions like "what can you do?" return guidance
+    - **Chat**: Regular conversation uses the Vorpal engine
+
     Messages are captured in Redis streams and may be stored in the vector
     store if they have high surprise scores (>= 0.7).
 
@@ -574,7 +657,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
         request: ChatRequest with user message
 
     Returns:
-        ChatResponse with Vorpal's reply
+        ChatResponse with routed reply
     """
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
@@ -582,28 +665,106 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # Capture input to Redis Stream (non-blocking, fire and forget)
     await stream_handler.capture_input(request.message)
 
+    # Route message to detect intent
+    routing_result = semantic_router.route(request.message)
+    intent = routing_result["intent"]
+    confidence = routing_result["confidence"]
+
+    logger.info(f"Routed message to intent={intent.value} (confidence={confidence:.2f})")
+
+    # Handle SEARCH_MEMORY intent
+    if intent == Intent.SEARCH_MEMORY:
+        query = routing_result.get("params", {}).get("query", request.message)
+        try:
+            # Search memories using vector similarity
+            results = vector_store.search_similar(
+                query_text=query,
+                top_k=5,
+                session_id=None
+            )
+
+            if not results:
+                response_text = "I couldn't find any relevant memories for that query."
+            else:
+                # Format memory results into a readable response
+                response_parts = ["I found these relevant memories:\n"]
+                for i, mem in enumerate(results, 1):
+                    # Truncate long messages
+                    msg_preview = mem['message'][:100]
+                    if len(mem['message']) > 100:
+                        msg_preview += "..."
+                    response_parts.append(
+                        f"{i}. {msg_preview} (similarity: {mem['similarity_score']:.2f})"
+                    )
+
+                response_text = "\n".join(response_parts)
+
+            return ChatResponse(
+                response=response_text,
+                engine="memory-search"
+            )
+
+        except Exception as e:
+            logger.error(f"Memory search error: {e}")
+            return ChatResponse(
+                response=f"Sorry, I encountered an error searching memories: {str(e)}",
+                engine="memory-search"
+            )
+
+    # Handle HELP intent
+    elif intent == Intent.HELP:
+        help_text = """I'm Archive-AI, your local AI companion with permanent memory.
+
+Here's what I can do:
+
+**Chat Modes:**
+• Chat - Regular conversation (fast, Vorpal engine)
+• Verified - Chain of Verification for accuracy
+• Basic Agent - ReAct agent with basic tools
+• Advanced - ReAct agent with advanced tools
+
+**Memory System:**
+• I automatically remember surprising conversations
+• Search memories with queries like "what did I say about Python?"
+• Browse all memories in the sidebar
+
+**Commands:**
+• Just ask questions naturally
+• Memory searches are automatic when you ask about past conversations
+• Use the mode buttons to switch between chat types
+
+Try asking me something or searching your memories!"""
+
+        return ChatResponse(
+            response=help_text,
+            engine="help"
+        )
+
+    # Handle CHAT intent (default)
     try:
         # Proxy request to Vorpal (vLLM OpenAI-compatible API)
         async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
+            # Use chat completions API for better conversational responses
             vorpal_payload = {
                 "model": config.VORPAL_MODEL,
-                "prompt": request.message,
+                "messages": [
+                    {"role": "user", "content": request.message}
+                ],
                 "max_tokens": 256,
                 "temperature": 0.7
             }
 
             response = await client.post(
-                f"{config.VORPAL_URL}/v1/completions",
+                f"{config.VORPAL_URL}/v1/chat/completions",
                 json=vorpal_payload
             )
             response.raise_for_status()
             result = response.json()
 
-            # Extract completion text from vLLM response
+            # Extract message content from chat completions response
             completion_text = result.get("choices", [{}])[0].get(
-                "text",
-                ""
-            ).strip()
+                "message", {}
+            ).get("content", "").strip()
 
             return ChatResponse(
                 response=completion_text,
