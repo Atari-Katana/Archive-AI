@@ -10,7 +10,7 @@ from typing import Dict, Tuple, Callable, Any, Optional
 
 from config import config
 from memory.vector_store import vector_store
-from brain.agents.code_validator import validate_code
+from agents.code_validator import validate_code
 
 
 async def memory_search(query: str) -> str:
