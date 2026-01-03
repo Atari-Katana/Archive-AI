@@ -106,6 +106,8 @@ services:
       - NVIDIA_VISIBLE_DEVICES=0  # Access for monitoring only
     ports:
       - "8080:8080"
+    volumes:
+      - ./ui:/app/ui  # Mount UI files for static serving
     networks:
       - archive-net
     deploy:

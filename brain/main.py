@@ -8,8 +8,10 @@ import time
 import httpx
 import logging
 import os
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 try:
@@ -25,6 +27,8 @@ from verification import ChainOfVerification
 from agents import ReActAgent, ToolRegistry, AgentStep, get_basic_tools, get_advanced_tools
 from memory.vector_store import vector_store
 from router import SemanticRouter, Intent
+from metrics_collector import router as metrics_router, collector
+from config_api import router as config_router
 
 
 app = FastAPI(
@@ -88,6 +92,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Include feature routers
+app.include_router(metrics_router)
+app.include_router(config_router)
+
+# Mount static files for UI panels
+ui_path = Path(__file__).parent / "ui"
+if ui_path.exists():
+    app.mount("/", StaticFiles(directory=str(ui_path), html=True), name="static")
+
 # Background task handle
 worker_task = None
 # Startup time for uptime calculation
@@ -137,6 +150,10 @@ async def startup():
         from workers.archiver import archiver
         await archiver.start()
         print("[Brain] Memory archival worker started")
+
+    # Start metrics collection (Task 3.2)
+    asyncio.create_task(collector.start_collection())
+    print("[Brain] Metrics collector started")
 
 
 @app.on_event("shutdown")
