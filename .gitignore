@@ -35,12 +35,6 @@ logs/
 Thumbs.db
 .directory
 
-# Model files (too large for git)
-# Exclude entire models directory (models auto-download on first use)
-models/
-!models/.gitkeep
-!models/README.md
-
 # Data directories
 data/redis/*
 !data/redis/.gitkeep
@@ -68,4 +62,3 @@ data/**/*.sqlite
 .mypy_cache/
 .dmypy.json
 dmypy.json
-
