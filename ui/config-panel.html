@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Archive-AI Configuration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 35px;
+        }
+
+        .section h2 {
+            color: #333;
+            font-size: 20px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="number"],
+        .form-group select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input[type="text"]:focus,
+        .form-group input[type="number"]:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+        }
+
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group small {
+            display: block;
+            color: #888;
+            margin-top: 5px;
+            font-size: 12px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+        }
+
+        button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .restart-warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .restart-warning.show {
+            display: block;
+        }
+
+        .restart-warning strong {
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ Archive-AI Configuration</h1>
+            <p>Web-based configuration editor with validation</p>
+        </div>
+
+        <div class="content">
+            <!-- Alerts -->
+            <div id="alert-success" class="alert alert-success"></div>
+            <div id="alert-error" class="alert alert-error"></div>
+            <div id="alert-warning" class="alert alert-warning"></div>
+
+            <!-- Loading -->
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 10px; color: #667eea;">Loading configuration...</p>
+            </div>
+
+            <!-- Configuration Form -->
+            <form id="config-form">
+                <!-- Service URLs -->
+                <div class="section">
+                    <h2>Service URLs</h2>
+
+                    <div class="form-group">
+                        <label for="vorpal_url">Vorpal URL</label>
+                        <input type="text" id="vorpal_url" name="vorpal_url" placeholder="http://vorpal:8000">
+                        <small>Chat and routing engine URL</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="goblin_url">Goblin URL</label>
+                        <input type="text" id="goblin_url" name="goblin_url" placeholder="http://goblin:8080">
+                        <small>Reasoning and coding engine URL</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sandbox_url">Sandbox URL</label>
+                        <input type="text" id="sandbox_url" name="sandbox_url" placeholder="http://sandbox:8000">
+                        <small>Code execution sandbox URL</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="voice_url">Voice URL</label>
+                        <input type="text" id="voice_url" name="voice_url" placeholder="http://voice:8001">
+                        <small>Voice I/O service URL</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="redis_url">Redis URL</label>
+                        <input type="text" id="redis_url" name="redis_url" placeholder="redis://redis:6379">
+                        <small>Redis connection URL (redis://host:port)</small>
+                    </div>
+                </div>
+
+                <!-- Feature Flags -->
+                <div class="section">
+                    <h2>Feature Flags</h2>
+
+                    <div class="form-group">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="async_memory" name="async_memory">
+                            <label for="async_memory">Enable Async Memory Worker</label>
+                        </div>
+                        <small>Background processing of memory/surprise scores</small>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="enable_voice" name="enable_voice">
+                            <label for="enable_voice">Enable Voice I/O</label>
+                        </div>
+                        <small>Speech-to-text and text-to-speech</small>
+                    </div>
+                </div>
+
+                <!-- Model Settings -->
+                <div class="section">
+                    <h2>Model Settings</h2>
+
+                    <div class="form-group">
+                        <label for="vorpal_model">Vorpal Model</label>
+                        <input type="text" id="vorpal_model" name="vorpal_model" placeholder="Qwen/Qwen2.5-3B-Instruct">
+                        <small>HuggingFace model identifier for Vorpal</small>
+                    </div>
+                </div>
+
+                <!-- Archive Settings -->
+                <div class="section">
+                    <h2>Archive Settings</h2>
+
+                    <div class="form-group">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="archive_enabled" name="archive_enabled">
+                            <label for="archive_enabled">Enable Archival</label>
+                        </div>
+                        <small>Automatically archive old memories to cold storage</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="archive_days_threshold">Archive Threshold (days)</label>
+                        <input type="number" id="archive_days_threshold" name="archive_days_threshold" min="1" max="365">
+                        <small>Archive memories older than this many days (1-365)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="archive_keep_recent">Keep Recent Count</label>
+                        <input type="number" id="archive_keep_recent" name="archive_keep_recent" min="100" max="10000">
+                        <small>Number of recent memories to keep in Redis (100-10000)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="archive_hour">Archive Hour (0-23)</label>
+                        <input type="number" id="archive_hour" name="archive_hour" min="0" max="23">
+                        <small>Hour to run archival (24-hour format)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="archive_minute">Archive Minute (0-59)</label>
+                        <input type="number" id="archive_minute" name="archive_minute" min="0" max="59">
+                        <small>Minute to run archival</small>
+                    </div>
+                </div>
+
+                <!-- Logging -->
+                <div class="section">
+                    <h2>Logging</h2>
+
+                    <div class="form-group">
+                        <label for="log_level">Log Level</label>
+                        <select id="log_level" name="log_level">
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                            <option value="CRITICAL">CRITICAL</option>
+                        </select>
+                        <small>Logging verbosity level</small>
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="button-group">
+                    <button type="submit" class="btn-primary">💾 Save Configuration</button>
+                    <button type="button" class="btn-secondary" onclick="loadConfig()">🔄 Reload</button>
+                    <button type="button" class="btn-danger" onclick="resetConfig()">⚠️ Reset to Defaults</button>
+                </div>
+
+                <!-- Restart Warning -->
+                <div id="restart-warning" class="restart-warning">
+                    <strong>⚠️ Restart Required:</strong> Changes will take effect after restarting services with <code>bash scripts/start.sh</code>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080';
+
+        // Show alert
+        function showAlert(type, message) {
+            const alertId = `alert-${type}`;
+            const alertEl = document.getElementById(alertId);
+            alertEl.textContent = message;
+            alertEl.classList.add('show');
+
+            // Hide after 5 seconds
+            setTimeout(() => {
+                alertEl.classList.remove('show');
+            }, 5000);
+        }
+
+        // Show/hide loading
+        function setLoading(show) {
+            const loadingEl = document.getElementById('loading');
+            const formEl = document.getElementById('config-form');
+
+            if (show) {
+                loadingEl.classList.add('show');
+                formEl.style.display = 'none';
+            } else {
+                loadingEl.classList.remove('show');
+                formEl.style.display = 'block';
+            }
+        }
+
+        // Show/hide restart warning
+        function showRestartWarning(show) {
+            const warningEl = document.getElementById('restart-warning');
+            if (show) {
+                warningEl.classList.add('show');
+            } else {
+                warningEl.classList.remove('show');
+            }
+        }
+
+        // Load configuration
+        async function loadConfig() {
+            setLoading(true);
+
+            try {
+                const response = await fetch(`${API_BASE}/config/`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const config = data.config;
+
+                // Populate form
+                document.getElementById('vorpal_url').value = config.vorpal_url || '';
+                document.getElementById('goblin_url').value = config.goblin_url || '';
+                document.getElementById('sandbox_url').value = config.sandbox_url || '';
+                document.getElementById('voice_url').value = config.voice_url || '';
+                document.getElementById('redis_url').value = config.redis_url || '';
+
+                document.getElementById('async_memory').checked = config.async_memory || false;
+                document.getElementById('enable_voice').checked = config.enable_voice || false;
+
+                document.getElementById('vorpal_model').value = config.vorpal_model || '';
+
+                document.getElementById('archive_enabled').checked = config.archive_enabled || false;
+                document.getElementById('archive_days_threshold').value = config.archive_days_threshold || 30;
+                document.getElementById('archive_keep_recent').value = config.archive_keep_recent || 1000;
+                document.getElementById('archive_hour').value = config.archive_hour || 3;
+                document.getElementById('archive_minute').value = config.archive_minute || 0;
+
+                document.getElementById('log_level').value = config.log_level || 'INFO';
+
+                showAlert('success', 'Configuration loaded successfully');
+                showRestartWarning(false);
+
+            } catch (error) {
+                console.error('Load error:', error);
+                showAlert('error', `Failed to load configuration: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Save configuration
+        async function saveConfig(event) {
+            event.preventDefault();
+            setLoading(true);
+
+            try {
+                // Gather form data
+                const formData = {
+                    vorpal_url: document.getElementById('vorpal_url').value,
+                    goblin_url: document.getElementById('goblin_url').value,
+                    sandbox_url: document.getElementById('sandbox_url').value,
+                    voice_url: document.getElementById('voice_url').value,
+                    redis_url: document.getElementById('redis_url').value,
+
+                    async_memory: document.getElementById('async_memory').checked,
+                    enable_voice: document.getElementById('enable_voice').checked,
+
+                    vorpal_model: document.getElementById('vorpal_model').value,
+
+                    archive_enabled: document.getElementById('archive_enabled').checked,
+                    archive_days_threshold: parseInt(document.getElementById('archive_days_threshold').value),
+                    archive_keep_recent: parseInt(document.getElementById('archive_keep_recent').value),
+                    archive_hour: parseInt(document.getElementById('archive_hour').value),
+                    archive_minute: parseInt(document.getElementById('archive_minute').value),
+
+                    log_level: document.getElementById('log_level').value,
+                };
+
+                const response = await fetch(`${API_BASE}/config/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                showAlert('success', 'Configuration saved successfully!');
+                showRestartWarning(data.restart_required);
+
+            } catch (error) {
+                console.error('Save error:', error);
+                showAlert('error', `Failed to save configuration: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Reset configuration
+        async function resetConfig() {
+            if (!confirm('Are you sure you want to reset configuration to defaults? This cannot be undone.')) {
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const response = await fetch(`${API_BASE}/config/reset`, {
+                    method: 'POST',
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `HTTP ${response.status}`);
+                }
+
+                showAlert('success', 'Configuration reset to defaults');
+                showRestartWarning(true);
+
+                // Reload config
+                await loadConfig();
+
+            } catch (error) {
+                console.error('Reset error:', error);
+                showAlert('error', `Failed to reset configuration: ${error.message}`);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        // Attach form submit handler
+        document.getElementById('config-form').addEventListener('submit', saveConfig);
+
+        // Load config on page load
+        window.addEventListener('DOMContentLoaded', loadConfig);
+    </script>
+</body>
+</html>

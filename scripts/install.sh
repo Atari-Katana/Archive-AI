@@ -157,6 +157,9 @@ print_success "Created models/whisper"
 mkdir -p models/f5-tts
 print_success "Created models/f5-tts"
 
+mkdir -p models/goblin
+print_success "Created models/goblin"
+
 # Create Library-Drop directory
 LIBRARY_DROP=$(grep LIBRARY_DROP .env | cut -d'=' -f2)
 LIBRARY_DROP=${LIBRARY_DROP:-~/ArchiveAI/Library-Drop}
@@ -181,6 +184,35 @@ fi
 
 print_info "Whisper models will auto-download on first use"
 print_info "F5-TTS models will auto-download on first use"
+
+# Check for Goblin model
+echo ""
+if [ -f "models/goblin/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf" ]; then
+    print_success "Goblin model found"
+else
+    print_warning "Goblin model not found"
+    echo ""
+    echo "The Goblin reasoning engine requires a 7B GGUF model (~8.4GB)."
+    echo "This is needed for dual-engine mode (Vorpal + Goblin)."
+    echo ""
+    read -p "Download Goblin model now? (Y/n): " -n 1 -r
+    echo ""
+    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+        print_info "Downloading Goblin model..."
+        python3 scripts/download-models.py --model goblin-7b
+        if [ $? -eq 0 ]; then
+            print_success "Goblin model downloaded successfully"
+        else
+            print_error "Download failed. You can run this later:"
+            echo "  python3 scripts/download-models.py --model goblin-7b"
+        fi
+    else
+        print_info "Skipping Goblin download. You can download later with:"
+        echo "  python3 scripts/download-models.py --model goblin-7b"
+        echo ""
+        print_warning "Without Goblin, only single-engine mode will be available"
+    fi
+fi
 
 # Step 5: Build Docker images
 print_header "Step 5: Building Docker Images"

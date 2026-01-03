@@ -30,7 +30,7 @@ Archive-AI is a self-hosted AI companion with permanent memory, dual inference e
 
 ### Prerequisites
 - **Hardware:**
-  - NVIDIA GPU with 16GB VRAM (RTX 5060 Ti, 4060 Ti 16GB, or equivalent)
+  - NVIDIA GPU with 16GB VRAM (RTX 5060 Ti, 4060 Ti 16GB, 3090, 4090)
   - 32GB RAM minimum (64GB recommended)
   - 50GB+ SSD storage
 - **Software:**
@@ -42,8 +42,43 @@ Archive-AI is a self-hosted AI companion with permanent memory, dual inference e
 
 ### Installation
 
-#### Automated Installation (Recommended)
+#### 🚀 One-Command Launch (Recommended for 16GB GPU)
 
+```bash
+# 1. Clone repository
+git clone https://github.com/yourusername/archive-ai.git
+cd archive-ai
+
+# 2. Configure environment
+cp .env.example .env
+nano .env  # Set REDIS_PASSWORD (generate with: openssl rand -base64 32)
+
+# 3. Download Goblin model (one-time setup)
+cd models/goblin
+wget https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf
+cd ../..
+
+# 4. Launch everything (dual-engine AWQ mode)
+bash go.sh
+# ✓ Starts Redis, Vorpal (7B AWQ), Goblin (7B GGUF), Brain, Voice, Librarian
+# ✓ Launches Web UI on http://localhost:8888
+# ✓ Press Ctrl+C to stop everything
+
+# 5. Verify health (in another terminal)
+bash scripts/health-check.sh
+```
+
+**What you get:**
+- **Vorpal Engine:** Qwen 2.5-7B-Instruct-AWQ (~6GB VRAM) for fast chat/routing
+- **Goblin Engine:** DeepSeek-R1-Distill-Qwen-7B (~5-6GB VRAM) for reasoning/coding
+- **Total VRAM:** ~14GB (fits 16GB GPU with 2GB headroom)
+- **Web UI:** Automatically started on port 8888
+
+---
+
+#### 📦 Automated Installation (Alternative Methods)
+
+**Standard Installation:**
 ```bash
 # 1. Clone repository
 git clone https://github.com/yourusername/archive-ai.git
@@ -53,14 +88,13 @@ cd archive-ai
 bash scripts/install.sh          # Development mode
 bash scripts/install.sh --prod   # Production mode
 
-# 3. Download Vorpal model
-# Place Llama-3-8B-Instruct (EXL2 4.0bpw) in ./models/vorpal/
-
-# 4. Start services
-bash scripts/start.sh            # Development mode
+# 3. Start services (choose one)
+bash go.sh                       # Dual-engine AWQ mode (recommended)
+# OR
+bash scripts/start.sh            # Single-engine mode (Vorpal 3B only)
 bash scripts/start.sh --prod     # Production mode
 
-# 5. Verify health
+# 4. Verify health
 bash scripts/health-check.sh
 ```
 
@@ -112,12 +146,29 @@ bash scripts/health-check.sh
 
 ## Architecture
 
+### Deployment Modes
+
+Archive-AI supports two deployment configurations:
+
+**Mode 1: Dual-Engine (AWQ 7B)** - `bash go.sh`
+- Vorpal: Qwen 2.5-7B-Instruct-AWQ (speed, routing, chat)
+- Goblin: DeepSeek-R1-Distill-Qwen-7B (reasoning, coding, agents)
+- VRAM: ~14GB total (fits 16GB GPU)
+
+**Mode 2: Single-Engine (Base 3B)** - `docker-compose up -d`
+- Vorpal: Qwen 2.5-3B-Instruct (all tasks)
+- Goblin: Disabled (CPU-only, minimal use)
+- VRAM: ~12GB total (fallback mode)
+
+See [CONFIG.md](Docs/CONFIG.md) for detailed configuration guide.
+
 ### Microservices
 
 | Service | Purpose | Tech Stack | Port |
 |---------|---------|------------|------|
 | **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8080 |
-| **Vorpal** | Speed Engine (LLM) | vLLM + Llama-3-8B | 8000 |
+| **Vorpal** | Speed Engine (LLM) | vLLM + Qwen 7B AWQ / 3B | 8000 |
+| **Goblin** | Reasoning Engine | llama.cpp + DeepSeek 7B | 8081 |
 | **Redis** | State + Vector DB | Redis Stack + RediSearch | 6379 |
 | **Voice** | Speech I/O | Faster-Whisper + F5-TTS | 8001 |
 | **Sandbox** | Code Execution | Isolated Python | 8003 |
@@ -178,6 +229,28 @@ User Input → Brain → Vorpal (LLM) → Surprise Scoring → Redis
 
 ## Configuration
 
+### Quick Start Commands
+
+**Dual-Engine Mode (Recommended):**
+```bash
+bash go.sh  # One command to start everything + Web UI
+```
+
+**Single-Engine Mode (Fallback):**
+```bash
+docker-compose up -d              # Start services only
+cd ui && python3 -m http.server 8888  # Launch UI manually
+```
+
+**Production Mode:**
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+See [CONFIG.md](Docs/CONFIG.md) for comprehensive configuration guide.
+
+---
+
 ### Environment Variables (.env)
 
 ```bash
@@ -204,8 +277,11 @@ LOG_LEVEL=INFO           # DEBUG/INFO/WARNING/ERROR
 
 # GPU
 CUDA_VISIBLE_DEVICES=0
-GPU_MEMORY_UTILIZATION=0.22
+VORPAL_GPU_MEMORY_UTILIZATION=0.45  # AWQ mode default
 ```
+
+**Advanced Tuning:**
+Create `config/user-config.env` to override model parameters without editing docker-compose files. See [CONFIG.md](Docs/CONFIG.md) for all available options.
 
 ---
 
@@ -388,7 +464,7 @@ docker logs --tail 100 archive-brain
 - Voice: 2-3 requests
 - Code execution: 10+ requests
 
-See [PERFORMANCE.md](PERFORMANCE.md) for detailed analysis and optimization recommendations.
+See [PERFORMANCE.md](Docs/PERFORMANCE.md) for detailed analysis and optimization recommendations.
 
 ---
 
@@ -425,7 +501,7 @@ See [PERFORMANCE.md](PERFORMANCE.md) for detailed analysis and optimization reco
    - Limited CPU/RAM (2 cores, 2GB)
    - Tmpfs /tmp only (512MB, noexec)
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for complete security guide.
+See [DEPLOYMENT.md](Docs/DEPLOYMENT.md) for complete security guide.
 
 ---
 
@@ -552,11 +628,14 @@ black brain/ sandbox/ librarian/
 
 ## Documentation
 
-- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide (385 lines)
-- **[PERFORMANCE.md](PERFORMANCE.md)** - Performance analysis & optimization (385 lines)
-- **[PROGRESS.md](PROGRESS.md)** - Development progress tracker
-- **[Docs/Archive-AI_System_Atlas_v7.5_REVISED.md](Docs/Archive-AI_System_Atlas_v7.5_REVISED.md)** - Architecture specification
-- **[Docs/CLAUDE_CODE_HANDOFF.md](Docs/CLAUDE_CODE_HANDOFF.md)** - Development guidelines
+- **[DEPLOYMENT.md](Docs/DEPLOYMENT.md)** - Production deployment guide (385 lines)
+- **[PERFORMANCE.md](Docs/PERFORMANCE.md)** - Performance analysis & optimization (385 lines)
+- **[PROGRESS.md](Docs/PROGRESS.md)** - Development progress tracker
+- **[CONFIG.md](Docs/CONFIG.md)** - Configuration guide & deployment modes
+- **[SYSTEM_STATUS.md](Docs/SYSTEM_STATUS.md)** - Current system status
+- **[Archive-AI System Atlas](Docs/Archive-AI_System_Atlas_v7.5_REVISED.md)** - Architecture specification
+- **[CLAUDE_CODE_HANDOFF.md](Docs/CLAUDE_CODE_HANDOFF.md)** - Development guidelines
+- **[GITHUB_SETUP.md](Docs/GITHUB_SETUP.md)** - Git workflow guide
 - **[checkpoints/](checkpoints/)** - Implementation checkpoints
 
 ---
@@ -585,17 +664,33 @@ black brain/ sandbox/ librarian/
 
 ## System Requirements
 
-### Minimum
+### Dual-Engine Mode (AWQ 7B) - `bash go.sh`
+**Minimum:**
 - GPU: 16GB VRAM (RTX 5060 Ti, 4060 Ti 16GB)
 - RAM: 32GB
 - CPU: 8+ cores
 - Storage: 50GB SSD
+- OS: Ubuntu 22.04+ or similar Linux
 
-### Recommended
+**Recommended:**
 - GPU: 16-24GB VRAM (RTX 5060 Ti, 3090, 4090)
 - RAM: 64GB
 - CPU: 12+ cores
 - Storage: 100GB NVMe SSD
+- OS: Ubuntu 22.04 LTS
+
+### Single-Engine Mode (Base 3B) - `docker-compose up -d`
+**Minimum:**
+- GPU: 12GB VRAM (RTX 3060 12GB, 4060 Ti, 5060)
+- RAM: 16GB
+- CPU: 4+ cores
+- Storage: 30GB SSD
+- OS: Ubuntu 22.04+ or similar Linux
+
+**Notes:**
+- Desktop environments (X11/Wayland) use 2-3GB VRAM - factor this into budget
+- AWQ models auto-download on first start (~3.5GB download)
+- GGUF models must be manually downloaded before starting Goblin
 
 ---
 
@@ -625,8 +720,29 @@ black brain/ sandbox/ librarian/
 ---
 
 **Version:** 7.5
-**Status:** Production Ready
-**Completion:** 76.7% (33/43 chunks)
-**Last Updated:** 2025-12-28
+**Status:** Production Ready (Dual-Engine AWQ Mode Available)
+**Completion:** 79.1% (34/43 chunks)
+**Last Updated:** 2026-01-02
 
 Built with Claude Code by [Your Name]
+
+---
+
+## Quick Reference
+
+**Start Archive-AI:**
+- Dual-Engine (Best): `bash go.sh`
+- Single-Engine: `docker-compose up -d`
+- Production: `docker-compose -f docker-compose.prod.yml up -d`
+
+**Access Points:**
+- Web UI: http://localhost:8888
+- API Docs: http://localhost:8080/docs
+- Health: http://localhost:8080/health
+- Redis Insight: http://localhost:8002
+
+**Essential Docs:**
+- [CONFIG.md](Docs/CONFIG.md) - Configuration guide & deployment modes
+- [DEPLOYMENT.md](Docs/DEPLOYMENT.md) - Production deployment
+- [PERFORMANCE.md](Docs/PERFORMANCE.md) - Performance tuning
+- [PROGRESS.md](Docs/PROGRESS.md) - Development status

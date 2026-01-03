@@ -10,6 +10,7 @@ from typing import Dict, Tuple, Callable, Any, Optional
 
 from config import config
 from memory.vector_store import vector_store
+from brain.agents.code_validator import validate_code
 
 
 async def memory_search(query: str) -> str:
@@ -92,13 +93,17 @@ async def code_execution(code: str) -> str:
 
         code = code.strip()
 
-        # Limit code length (prevent abuse)
-        if len(code) > 5000:
-            return f"Error: Code too long ({len(code)} chars). Maximum 5000 characters."
+        # Validate code before execution
+        is_valid, validation_msg = validate_code(code)
 
-        # Basic safety check (sandbox will enforce anyway)
-        if "import os" in code or "import subprocess" in code:
-            return "Warning: File system and subprocess operations are blocked in the sandbox."
+        # If validation failed (critical issues), return error
+        if not is_valid:
+            return f"Validation Error:\n{validation_msg}"
+
+        # If validation passed but has warnings, prepend warning to output
+        warning_prefix = ""
+        if validation_msg:
+            warning_prefix = f"{validation_msg}\n\n"
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
@@ -110,7 +115,7 @@ async def code_execution(code: str) -> str:
 
             # Format output
             if result.get("error"):
-                return f"Execution Error:\n{result['error']}"
+                return f"{warning_prefix}Execution Error:\n{result['error']}"
 
             stdout = result.get("stdout", "").strip()
             stderr = result.get("stderr", "").strip()
@@ -123,16 +128,12 @@ async def code_execution(code: str) -> str:
                     output += "\n\n"
                 output += f"Warnings/Errors:\n{stderr}"
 
-            # If no output but code executed successfully, try to help the agent
+            # If no output, the validator already warned about this
             if not output:
-                # Check if code defines a function but doesn't call it
-                if "def " in code and "print(" not in code.lower():
-                    return ("Code executed successfully (no output).\n"
-                            "HINT: Your code defined a function but didn't call it or print the result. "
-                            "Try calling the function and printing the output, like: print(factorial(7))")
-                return "Code executed successfully (no output).\nHINT: Add print() statements to see output."
+                return f"{warning_prefix}Code executed successfully (no output)."
 
-            return output
+            # Return output with any warnings prepended
+            return f"{warning_prefix}{output}" if warning_prefix else output
 
     except httpx.HTTPError as e:
         return f"Sandbox service error: {str(e)}"

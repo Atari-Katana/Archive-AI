@@ -7,5 +7,11 @@ redis==7.1.0
 # HTTP client for API testing
 requests==2.32.5
 
+# Progress bars for model downloads
+tqdm>=4.66.0
+
 # Development tools
 flake8==7.3.0
+
+# System monitoring for stress tests
+psutil>=6.1.0
