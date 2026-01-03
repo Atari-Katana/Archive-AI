@@ -65,3 +65,9 @@ dmypy.json
 
 # Tauri
 /src-tauri/target/
+
+# Large model files
+*.gguf
+*.safetensors
+*.bin
+*.pt
