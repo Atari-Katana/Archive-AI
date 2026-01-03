@@ -62,3 +62,6 @@ data/**/*.sqlite
 .mypy_cache/
 .dmypy.json
 dmypy.json
+
+# Tauri
+/src-tauri/target/
