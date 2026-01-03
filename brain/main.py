@@ -96,10 +96,10 @@ app.add_middleware(
 app.include_router(metrics_router)
 app.include_router(config_router)
 
-# Mount static files for UI panels
+# Mount static files for UI panels at /ui path to avoid route conflicts
 ui_path = Path(__file__).parent / "ui"
 if ui_path.exists():
-    app.mount("/", StaticFiles(directory=str(ui_path), html=True), name="static")
+    app.mount("/ui", StaticFiles(directory=str(ui_path), html=True), name="static")
 
 # Background task handle
 worker_task = None
