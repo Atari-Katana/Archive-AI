@@ -71,3 +71,7 @@ dmypy.json
 *.safetensors
 *.bin
 *.pt
+# Model cache directories (Hugging Face)
+models/whisper/hub/
+models/*/hub/
+*.safetensors
