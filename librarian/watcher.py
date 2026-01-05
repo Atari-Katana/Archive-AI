@@ -198,8 +198,8 @@ def main():
     )
     parser.add_argument(
         '--redis-url',
-        default='redis://redis:6379',
-        help='Redis connection URL (default: redis://redis:6379)'
+        default=os.getenv('REDIS_URL', 'redis://redis:6379'),
+        help='Redis connection URL (default: from REDIS_URL env or redis://redis:6379)'
     )
 
     args = parser.parse_args()

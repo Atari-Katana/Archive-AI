@@ -1,0 +1,231 @@
+version: '3.8'
+
+# Cloudflare-Optimized Docker Compose Configuration
+# Archive-AI v7.5 - For Cloudflare Tunnel deployment
+#
+# Usage:
+#   ./go-cloudflare.sh
+#
+# This file is designed to work standalone without base docker-compose.yml
+# to avoid port conflicts from merging
+
+services:
+  redis:
+    image: redis/redis-stack:latest
+    container_name: archive-redis-cf
+    environment:
+      - REDIS_ARGS=--maxmemory 20gb --maxmemory-policy allkeys-lru --appendonly yes --protected-mode no --requirepass ${REDIS_PASSWORD:-changeme}
+    ports:
+      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:8002:8001"
+    volumes:
+      - ./data/redis:/data
+    deploy:
+      resources:
+        limits:
+          memory: 24G
+    networks:
+      - archive-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  vorpal:
+    build: ./vorpal
+    image: archive-ai/vorpal:latest
+    container_name: archive-vorpal-cf
+    environment:
+      - VORPAL_MODEL=${VORPAL_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+      - VORPAL_GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.45}
+      - VORPAL_MAX_MODEL_LEN=${VORPAL_MAX_MODEL_LEN:-4096}
+      - VORPAL_MAX_NUM_SEQS=${VORPAL_MAX_NUM_SEQS:-64}
+      - CUDA_VISIBLE_DEVICES=0
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./models/vorpal:/models
+    networks:
+      - archive-net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+    command:
+      - "${VORPAL_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--gpu-memory-utilization"
+      - "${VORPAL_GPU_MEMORY_UTILIZATION:-0.45}"
+      - "--max-model-len"
+      - "${VORPAL_MAX_MODEL_LEN:-4096}"
+      - "--max-num-seqs"
+      - "${VORPAL_MAX_NUM_SEQS:-64}"
+
+  goblin:
+    image: ghcr.io/ggml-org/llama.cpp:server
+    container_name: archive-goblin-cf
+    environment:
+      - MODEL_PATH=${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf}
+      - N_GPU_LAYERS=${GOBLIN_N_GPU_LAYERS:-20}
+      - CTX_SIZE=${GOBLIN_CTX_SIZE:-8192}
+      - HOST=0.0.0.0
+      - PORT=8080
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ./models/goblin:/models
+    networks:
+      - archive-net
+    restart: unless-stopped
+    command:
+      - "--model"
+      - "${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+      - "--ctx-size"
+      - "${GOBLIN_CTX_SIZE:-8192}"
+      - "--n-gpu-layers"
+      - "${GOBLIN_N_GPU_LAYERS:-20}"
+      - "--threads"
+      - "${GOBLIN_THREADS:-8}"
+      - "--batch-size"
+      - "${GOBLIN_BATCH_SIZE:-512}"
+      - "--ubatch-size"
+      - "${GOBLIN_UBATCH_SIZE:-512}"
+      - "--flash-attn"
+      - "on"
+      - "--cont-batching"
+      - "--metrics"
+
+  brain:
+    build: ./brain
+    image: archive-ai/brain:latest
+    container_name: archive-brain-cf
+    depends_on:
+      redis:
+        condition: service_healthy
+      vorpal:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - VORPAL_MODEL=${VORPAL_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+      - VORPAL_URL=http://vorpal:8000
+      - GOBLIN_URL=http://goblin:8080
+      - SANDBOX_URL=http://sandbox:8000
+      - VOICE_URL=http://voice:8001
+      - ASYNC_MEMORY=true
+      - ARCHIVE_ENABLED=true
+      - ARCHIVE_DAYS_THRESHOLD=${ARCHIVE_DAYS:-30}
+      - ARCHIVE_KEEP_RECENT=${ARCHIVE_KEEP:-1000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PUBLIC_URL=${PUBLIC_URL:-http://localhost:8080}
+      - BRAIN_URL=${PUBLIC_URL:-http://localhost:8080}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - NVIDIA_VISIBLE_DEVICES=0
+    ports:
+      - "${BRAIN_PORT:-8080}:8080"
+    volumes:
+      - ./ui:/app/ui
+      - ./data/archive:/app/data/archive
+    networks:
+      - archive-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [utility]
+
+  sandbox:
+    build: ./sandbox
+    image: archive-ai/sandbox:latest
+    container_name: archive-sandbox-cf
+    ports:
+      - "127.0.0.1:8003:8000"
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+
+  voice:
+    build: ./voice
+    image: archive-ai/voice:latest
+    container_name: archive-voice-cf
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - WHISPER_DEVICE=cpu
+      - WHISPER_COMPUTE_TYPE=int8
+      - TTS_DEVICE=cpu
+      - TTS_MODEL_CACHE=/models/cache
+    ports:
+      - "127.0.0.1:8001:8001"
+    volumes:
+      - ./models/whisper:/root/.cache/huggingface
+      - ./models/f5-tts:/models/cache
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+
+  librarian:
+    build: ./librarian
+    image: archive-ai/librarian:latest
+    container_name: archive-librarian-cf
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - WATCH_DIR=/watch
+    volumes:
+      - ${LIBRARY_DROP:-~/ArchiveAI/Library-Drop}:/watch
+      - ./data/library:/data
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+networks:
+  archive-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

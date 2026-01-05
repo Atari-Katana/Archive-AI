@@ -9,13 +9,19 @@ import os
 class Config:
     """Application configuration"""
 
-    # Service URLs
+    # Service URLs (internal Docker network)
     VORPAL_URL = os.getenv("VORPAL_URL", "http://vorpal:8000")
     GOBLIN_URL = os.getenv("GOBLIN_URL", "http://goblin:8080")
     SANDBOX_URL = os.getenv("SANDBOX_URL", "http://sandbox:8000")
     VOICE_URL = os.getenv("VOICE_URL", "http://voice:8001")
     REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
-    BRAIN_URL = "http://localhost:8080"  # Internal brain URL for agents
+
+    # Public-facing URL (use PUBLIC_URL env var for Cloudflare/production, fallback to localhost)
+    PUBLIC_URL = os.getenv("PUBLIC_URL", "http://localhost:8080")
+    BRAIN_URL = PUBLIC_URL  # Used by agents and external references
+
+    # Proxy settings (for Cloudflare, nginx, etc.)
+    TRUST_PROXY = os.getenv("TRUST_PROXY", "false").lower() == "true"
     MEMORY_LAST_ID_KEY = os.getenv("MEMORY_LAST_ID_KEY", "memory_worker:last_id")
     MEMORY_START_FROM_LATEST = os.getenv("MEMORY_START_FROM_LATEST", "true").lower() == "true"
     LOG_DIR = os.getenv("LOG_DIR", "logs")

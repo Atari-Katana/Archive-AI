@@ -1,0 +1,175 @@
+version: '3.8'
+
+# Cloudflare-Optimized Docker Compose Configuration
+# Archive-AI v7.5 - For Cloudflare Tunnel deployment
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.cloudflare.yml up -d
+#
+# This overlay:
+# - Exposes only Brain service (single entry point)
+# - Binds to 0.0.0.0 for Cloudflare Tunnel access
+# - Secures internal services (localhost only)
+# - Adds health checks for reliability
+
+services:
+  # Redis - Internal only (not exposed externally)
+  redis:
+    container_name: archive-redis-cf
+    environment:
+      - REDIS_ARGS=--maxmemory 20gb --maxmemory-policy allkeys-lru --appendonly yes --protected-mode no --requirepass ${REDIS_PASSWORD:-changeme}
+    ports:
+      - "127.0.0.1:6379:6379"      # Internal only
+      - "127.0.0.1:8002:8001"      # RedisInsight internal only
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Vorpal - Internal only
+  vorpal:
+    container_name: archive-vorpal-cf
+    ports:
+      - "127.0.0.1:8000:8000"      # Internal only - accessed via Brain
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 120s
+
+  # Goblin - Internal only
+  goblin:
+    container_name: archive-goblin-cf
+    ports:
+      - "127.0.0.1:8081:8080"      # Internal only
+    restart: unless-stopped
+
+  # Brain - ONLY publicly exposed service
+  brain:
+    container_name: archive-brain-cf
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+      - VORPAL_URL=http://vorpal:8000
+      - GOBLIN_URL=http://goblin:8080
+      - SANDBOX_URL=http://sandbox:8000
+      - VOICE_URL=http://voice:8001
+      - ASYNC_MEMORY=true
+      - ARCHIVE_ENABLED=true
+      - ARCHIVE_DAYS_THRESHOLD=${ARCHIVE_DAYS:-30}
+      - ARCHIVE_KEEP_RECENT=${ARCHIVE_KEEP:-1000}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      # Cloudflare-specific settings
+      - PUBLIC_URL=${PUBLIC_URL:-https://your-domain.com}  # Set your Cloudflare domain
+      - BRAIN_URL=${PUBLIC_URL:-https://your-domain.com}   # Use public URL instead of localhost
+      - TRUST_PROXY=true  # Trust Cloudflare proxy headers
+    ports:
+      - "${BRAIN_PORT:-8080}:8080"  # Exposed to 0.0.0.0 for Cloudflare Tunnel
+    volumes:
+      - ./data/archive:/app/data/archive
+      - ./ui:/app/ui  # UI files served at /ui/ path
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    depends_on:
+      redis:
+        condition: service_healthy
+      vorpal:
+        condition: service_healthy
+
+  # Sandbox - Internal only
+  sandbox:
+    container_name: archive-sandbox-cf
+    ports:
+      - "127.0.0.1:8003:8000"      # Internal only
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=512m
+
+  # Voice - Internal only
+  voice:
+    container_name: archive-voice-cf
+    environment:
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}
+      - WHISPER_DEVICE=cpu
+      - TTS_DEVICE=cpu
+    ports:
+      - "127.0.0.1:8001:8001"      # Internal only
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+
+  # Librarian - No external ports
+  librarian:
+    container_name: archive-librarian-cf
+    environment:
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-changeme}@redis:6379
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+networks:
+  archive-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Cloudflare Tunnel Setup Instructions:
+#
+# 1. Install cloudflared:
+#    curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+#    sudo dpkg -i cloudflared.deb
+#
+# 2. Authenticate with Cloudflare:
+#    cloudflared tunnel login
+#
+# 3. Create a tunnel:
+#    cloudflared tunnel create archive-ai
+#
+# 4. Create config file at ~/.cloudflared/config.yml:
+#    tunnel: <TUNNEL-ID>
+#    credentials-file: /home/user/.cloudflared/<TUNNEL-ID>.json
+#
+#    ingress:
+#      - hostname: your-domain.com
+#        service: http://localhost:8080
+#      - hostname: www.your-domain.com
+#        service: http://localhost:8080
+#      - service: http_status:404
+#
+# 5. Route DNS:
+#    cloudflared tunnel route dns archive-ai your-domain.com
+#
+# 6. Run tunnel:
+#    cloudflared tunnel run archive-ai
+#
+# 7. Set PUBLIC_URL in .env:
+#    PUBLIC_URL=https://your-domain.com
+#
+# Access points with Cloudflare:
+# - Main UI: https://your-domain.com/ui/index.html
+# - Metrics: https://your-domain.com/ui/metrics-panel.html
+# - Config:  https://your-domain.com/ui/config-panel.html
+# - API:     https://your-domain.com/docs
+# - Health:  https://your-domain.com/health
