@@ -14,6 +14,7 @@ class Config:
     GOBLIN_URL = os.getenv("GOBLIN_URL", "http://goblin:8080")
     SANDBOX_URL = os.getenv("SANDBOX_URL", "http://sandbox:8000")
     VOICE_URL = os.getenv("VOICE_URL", "http://voice:8001")
+    BIFROST_URL = os.getenv("BIFROST_URL", "http://bifrost:8080")
     REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 
     # Public-facing URL (use PUBLIC_URL env var for Cloudflare/production, fallback to localhost)
@@ -33,7 +34,8 @@ class Config:
 
     # Brain settings
     DEFAULT_ENGINE = "vorpal"
-    REQUEST_TIMEOUT = 30  # seconds
+    REQUEST_TIMEOUT = 60  # Increased timeout for longer responses
+    MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1024"))
 
     # Model names
     VORPAL_MODEL = os.getenv("VORPAL_MODEL", "Qwen/Qwen2.5-3B-Instruct")

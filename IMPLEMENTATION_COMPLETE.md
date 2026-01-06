@@ -297,6 +297,9 @@ All new dependencies have been added to `requirements.txt`:
 - `tqdm>=4.66.0` - Progress bars for downloads
 - `psutil>=6.1.0` - System monitoring for metrics
 
+For Flutter UI (`ui/flutter_ui/pubspec.yaml`):
+- `http: ^1.1.0` - API communication
+
 All other dependencies (pydantic, fastapi, httpx, numpy) were already present.
 
 ---
@@ -305,17 +308,18 @@ All other dependencies (pydantic, fastapi, httpx, numpy) were already present.
 
 ### 1. Test the Integration
 
-Start the services and verify everything works:
+Start the services using the new master script:
 
 ```bash
-# Start all services
-docker-compose up -d
+# Interactive start
+./start
 
-# Check logs
+# Check logs (in separate terminal)
 docker-compose logs -f brain
 
 # Verify metrics endpoint
-curl http://localhost:8080/metrics/current | jq
+curl http://localhost:8081/metrics/current | jq
+```
 
 # Verify config endpoint
 curl http://localhost:8080/config/ | jq
@@ -324,9 +328,9 @@ curl http://localhost:8080/config/ | jq
 ### 2. Access the UI Panels
 
 Open in your browser:
-- **Main UI:** http://localhost:8080/index.html
-- **Metrics Dashboard:** http://localhost:8080/metrics-panel.html
-- **Configuration Editor:** http://localhost:8080/config-panel.html
+- **Main UI:** http://localhost:8888 (if started via ./start --web) or http://localhost:8081/ui/index.html
+- **Metrics Dashboard:** http://localhost:8081/ui/metrics-panel.html
+- **Configuration Editor:** http://localhost:8081/ui/config-panel.html
 
 ### 3. Run the Test Suites
 

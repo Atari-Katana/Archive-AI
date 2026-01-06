@@ -1,0 +1,611 @@
+{
+  "test_date": "2026-01-06T07:46:41.033930",
+  "total_tests": 27,
+  "passed": 0,
+  "failed": 27,
+  "success_rate": 0.0,
+  "total_time": 14.06404733657837,
+  "avg_response_time": 0.020237225073355215,
+  "avg_steps": 0,
+  "passed_overall": false,
+  "results": [
+    {
+      "test_id": "basic-001",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.023242950439453125,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "basic-001",
+        "name": "Simple Calculator",
+        "question": "What is 456 multiplied by 789?",
+        "expected_tools": [
+          "Calculator"
+        ],
+        "expected_answer": "359784",
+        "difficulty": "easy",
+        "category": "basic_tools"
+      }
+    },
+    {
+      "test_id": "basic-002",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.01858353614807129,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "basic-002",
+        "name": "String Length",
+        "question": "How many characters are in the word 'supercalifragilisticexpialidocious'?",
+        "expected_tools": [
+          "StringLength"
+        ],
+        "expected_answer": "34",
+        "difficulty": "easy",
+        "category": "basic_tools"
+      }
+    },
+    {
+      "test_id": "basic-003",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.01888251304626465,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "basic-003",
+        "name": "Word Count",
+        "question": "Count the words in this sentence: The quick brown fox jumps over the lazy dog",
+        "expected_tools": [
+          "WordCount"
+        ],
+        "expected_answer": "9",
+        "difficulty": "easy",
+        "category": "basic_tools"
+      }
+    },
+    {
+      "test_id": "basic-004",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018489599227905273,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "basic-004",
+        "name": "Reverse String",
+        "question": "What is 'hello world' reversed?",
+        "expected_tools": [
+          "ReverseString"
+        ],
+        "expected_answer": "dlrow olleh",
+        "difficulty": "easy",
+        "category": "basic_tools"
+      }
+    },
+    {
+      "test_id": "basic-005",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018531322479248047,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "basic-005",
+        "name": "Uppercase Conversion",
+        "question": "Convert 'archive ai' to uppercase",
+        "expected_tools": [
+          "ToUppercase"
+        ],
+        "expected_answer": "ARCHIVE AI",
+        "difficulty": "easy",
+        "category": "basic_tools"
+      }
+    },
+    {
+      "test_id": "basic-006",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.0234835147857666,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "basic-006",
+        "name": "Extract Numbers",
+        "question": "Extract all numbers from this text: abc123def456ghi789",
+        "expected_tools": [
+          "ExtractNumbers"
+        ],
+        "expected_answer": "123, 456, 789",
+        "difficulty": "easy",
+        "category": "basic_tools"
+      }
+    },
+    {
+      "test_id": "advanced-001",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.019106388092041016,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "advanced-001",
+        "name": "Memory Search",
+        "question": "Search my memories for anything related to 'calculator'",
+        "expected_tools": [
+          "MemorySearch"
+        ],
+        "difficulty": "medium",
+        "category": "advanced_tools"
+      }
+    },
+    {
+      "test_id": "advanced-002",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.019460439682006836,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "advanced-002",
+        "name": "Code Execution - Factorial",
+        "question": "Write Python code to calculate the factorial of 7",
+        "expected_tools": [
+          "CodeExecution"
+        ],
+        "expected_answer": "5040",
+        "difficulty": "medium",
+        "category": "advanced_tools"
+      }
+    },
+    {
+      "test_id": "advanced-003",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018455028533935547,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "advanced-003",
+        "name": "Current DateTime",
+        "question": "What is the current date and time?",
+        "expected_tools": [
+          "DateTime"
+        ],
+        "difficulty": "easy",
+        "category": "advanced_tools"
+      }
+    },
+    {
+      "test_id": "advanced-004",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.019423484802246094,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "advanced-004",
+        "name": "JSON Parsing",
+        "question": "Parse this JSON and tell me the value of 'name': {\"name\": \"Archive-AI\", \"version\": \"7.5\"}",
+        "expected_tools": [
+          "JSON"
+        ],
+        "expected_answer": "Archive-AI",
+        "difficulty": "medium",
+        "category": "advanced_tools"
+      }
+    },
+    {
+      "test_id": "multi-001",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018312931060791016,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "multi-001",
+        "name": "Calculator Chain",
+        "question": "Calculate (25 + 75) divided by 5, then multiply the result by 3",
+        "expected_tools": [
+          "Calculator"
+        ],
+        "expected_answer": "60",
+        "difficulty": "medium",
+        "category": "multi_step"
+      }
+    },
+    {
+      "test_id": "multi-002",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.022919416427612305,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "multi-002",
+        "name": "String Manipulation Chain",
+        "question": "Take the word 'Python', convert it to uppercase, then reverse it, then tell me how many characters it has",
+        "expected_tools": [
+          "ToUppercase",
+          "ReverseString",
+          "StringLength"
+        ],
+        "expected_answer": "6",
+        "difficulty": "medium",
+        "category": "multi_step"
+      }
+    },
+    {
+      "test_id": "multi-003",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.020343542098999023,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "multi-003",
+        "name": "Math and Text",
+        "question": "Calculate 144 divided by 12, then convert that number to words and count the letters",
+        "expected_tools": [
+          "Calculator",
+          "StringLength"
+        ],
+        "expected_answer": "6",
+        "difficulty": "hard",
+        "category": "multi_step"
+      }
+    },
+    {
+      "test_id": "multi-004",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.019366741180419922,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "multi-004",
+        "name": "Code and Calculate",
+        "question": "Write Python code to find all prime numbers between 1 and 20, then count how many there are",
+        "expected_tools": [
+          "CodeExecution"
+        ],
+        "expected_answer": "8",
+        "difficulty": "hard",
+        "category": "multi_step"
+      }
+    },
+    {
+      "test_id": "multi-005",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.02800917625427246,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "multi-005",
+        "name": "Memory and Time",
+        "question": "What's the current time? Then search my memories for any conversations about 'time'",
+        "expected_tools": [
+          "DateTime",
+          "MemorySearch"
+        ],
+        "difficulty": "medium",
+        "category": "multi_step"
+      }
+    },
+    {
+      "test_id": "edge-001",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.01929330825805664,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "edge-001",
+        "name": "Division by Zero (should handle gracefully)",
+        "question": "What is 100 divided by 0?",
+        "expected_tools": [
+          "Calculator"
+        ],
+        "difficulty": "medium",
+        "category": "edge_cases",
+        "expect_error": true
+      }
+    },
+    {
+      "test_id": "edge-002",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.020307064056396484,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "edge-002",
+        "name": "Invalid JSON",
+        "question": "Parse this JSON: {invalid json here}",
+        "expected_tools": [
+          "JSON"
+        ],
+        "difficulty": "medium",
+        "category": "edge_cases",
+        "expect_error": true
+      }
+    },
+    {
+      "test_id": "edge-003",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.019799232482910156,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "edge-003",
+        "name": "Empty String Operations",
+        "question": "What is the length of an empty string?",
+        "expected_tools": [
+          "StringLength"
+        ],
+        "expected_answer": "0",
+        "difficulty": "easy",
+        "category": "edge_cases"
+      }
+    },
+    {
+      "test_id": "edge-004",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.0187528133392334,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "edge-004",
+        "name": "Very Large Calculation",
+        "question": "Calculate 999999 multiplied by 888888",
+        "expected_tools": [
+          "Calculator"
+        ],
+        "expected_answer": "888887111112",
+        "difficulty": "medium",
+        "category": "edge_cases"
+      }
+    },
+    {
+      "test_id": "complex-001",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.01855301856994629,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "complex-001",
+        "name": "Text Analysis Pipeline",
+        "question": "Take this text 'The AI system has 42 tools and 7 modes', extract the numbers, sum them up, then tell me if the result is greater than 45",
+        "expected_tools": [
+          "ExtractNumbers",
+          "Calculator"
+        ],
+        "expected_answer": "49",
+        "difficulty": "hard",
+        "category": "complex"
+      }
+    },
+    {
+      "test_id": "complex-002",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018457412719726562,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "complex-002",
+        "name": "Data Processing",
+        "question": "Write Python code to calculate the sum of squares of numbers from 1 to 10",
+        "expected_tools": [
+          "CodeExecution"
+        ],
+        "expected_answer": "385",
+        "difficulty": "hard",
+        "category": "complex"
+      }
+    },
+    {
+      "test_id": "complex-003",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.01975727081298828,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "complex-003",
+        "name": "String and Math Combo",
+        "question": "Count the words in 'Archive AI is a cognitive framework', then multiply that count by 6",
+        "expected_tools": [
+          "WordCount",
+          "Calculator"
+        ],
+        "expected_answer": "36",
+        "difficulty": "medium",
+        "category": "complex"
+      }
+    },
+    {
+      "test_id": "complex-004",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018255949020385742,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "complex-004",
+        "name": "Character Counting (Known Bug)",
+        "question": "How many times does the letter 's' appear in the word 'mississippi'?",
+        "expected_tools": [
+          "CodeExecution"
+        ],
+        "expected_answer": "4",
+        "difficulty": "hard",
+        "category": "complex",
+        "known_issue": "Letter counting is a known LLM weakness"
+      }
+    },
+    {
+      "test_id": "complex-005",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.017930269241333008,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "complex-005",
+        "name": "Fibonacci Sequence",
+        "question": "Write Python code to generate the first 10 Fibonacci numbers",
+        "expected_tools": [
+          "CodeExecution"
+        ],
+        "expected_answer": "0, 1, 1, 2, 3, 5, 8, 13, 21, 34",
+        "difficulty": "hard",
+        "category": "complex"
+      }
+    },
+    {
+      "test_id": "ambig-001",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.0302731990814209,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "ambig-001",
+        "name": "Implicit Math",
+        "question": "If I have 3 apples and buy 7 more, how many do I have?",
+        "expected_tools": [
+          "Calculator"
+        ],
+        "expected_answer": "10",
+        "difficulty": "medium",
+        "category": "reasoning"
+      }
+    },
+    {
+      "test_id": "ambig-002",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.019491910934448242,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "ambig-002",
+        "name": "Word Problem",
+        "question": "A string has 15 characters, then 3 are removed. What's the new length?",
+        "expected_tools": [
+          "Calculator"
+        ],
+        "expected_answer": "12",
+        "difficulty": "medium",
+        "category": "reasoning"
+      }
+    },
+    {
+      "test_id": "ambig-003",
+      "passed": false,
+      "reason": "Agent failed: Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "success": false,
+      "error": "Client error '405 Method Not Allowed' for url 'http://localhost:8080/agent/advanced'\nFor more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405",
+      "response_time": 0.018923044204711914,
+      "answer": null,
+      "steps": [],
+      "tools_used": [],
+      "test_case": {
+        "id": "ambig-003",
+        "name": "Time Awareness",
+        "question": "What year is it right now?",
+        "expected_tools": [
+          "DateTime"
+        ],
+        "expected_answer": "2025",
+        "difficulty": "easy",
+        "category": "reasoning"
+      }
+    }
+  ]
+}

@@ -19,8 +19,8 @@ services:
     environment:
       - REDIS_ARGS=--maxmemory 20gb --maxmemory-policy allkeys-lru --appendonly yes --protected-mode no --requirepass ${REDIS_PASSWORD:-changeme}
     ports:
-      - "127.0.0.1:6379:6379"      # Internal only
-      - "127.0.0.1:8002:8001"      # RedisInsight internal only
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"      # Internal only
+      - "127.0.0.1:${REDIS_UI_PORT:-8002}:8001"      # RedisInsight internal only
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
@@ -32,7 +32,7 @@ services:
   vorpal:
     container_name: archive-vorpal-cf
     ports:
-      - "127.0.0.1:8000:8000"      # Internal only - accessed via Brain
+      - "127.0.0.1:${VORPAL_PORT:-8000}:8000"      # Internal only - accessed via Brain
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
@@ -45,7 +45,7 @@ services:
   goblin:
     container_name: archive-goblin-cf
     ports:
-      - "127.0.0.1:8081:8080"      # Internal only
+      - "127.0.0.1:${GOBLIN_PORT:-8082}:8080"      # Internal only
     restart: unless-stopped
 
   # Brain - ONLY publicly exposed service
@@ -67,13 +67,13 @@ services:
       - BRAIN_URL=${PUBLIC_URL:-https://your-domain.com}   # Use public URL instead of localhost
       - TRUST_PROXY=true  # Trust Cloudflare proxy headers
     ports:
-      - "${BRAIN_PORT:-8080}:8080"  # Exposed to 0.0.0.0 for Cloudflare Tunnel
+      - "${BRAIN_PORT:-8081}:8001"  # Exposed to 0.0.0.0 for Cloudflare Tunnel
     volumes:
       - ./data/archive:/app/data/archive
       - ./ui:/app/ui  # UI files served at /ui/ path
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -87,7 +87,7 @@ services:
   sandbox:
     container_name: archive-sandbox-cf
     ports:
-      - "127.0.0.1:8003:8000"      # Internal only
+      - "127.0.0.1:${SANDBOX_PORT:-8003}:8000"      # Internal only
     restart: unless-stopped
     deploy:
       resources:
@@ -108,7 +108,7 @@ services:
       - WHISPER_DEVICE=cpu
       - TTS_DEVICE=cpu
     ports:
-      - "127.0.0.1:8001:8001"      # Internal only
+      - "127.0.0.1:${VOICE_PORT:-8001}:8001"      # Internal only
     restart: unless-stopped
     deploy:
       resources:

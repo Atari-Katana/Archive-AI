@@ -16,8 +16,8 @@ services:
     environment:
       - REDIS_ARGS=--maxmemory 20gb --maxmemory-policy allkeys-lru --appendonly yes --protected-mode no --requirepass ${REDIS_PASSWORD:-changeme}
     ports:
-      - "127.0.0.1:6379:6379"
-      - "127.0.0.1:8002:8001"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_UI_PORT:-8002}:8001"
     volumes:
       - ./data/redis:/data
     deploy:
@@ -44,7 +44,7 @@ services:
       - VORPAL_MAX_NUM_SEQS=${VORPAL_MAX_NUM_SEQS:-64}
       - CUDA_VISIBLE_DEVICES=0
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${VORPAL_PORT:-8000}:8000"
     volumes:
       - ./models/vorpal:/models
     networks:
@@ -86,7 +86,7 @@ services:
       - HOST=0.0.0.0
       - PORT=8080
     ports:
-      - "127.0.0.1:8081:8080"
+      - "127.0.0.1:${GOBLIN_PORT:-8082}:8080"
     volumes:
       - ./models/goblin:/models
     networks:
@@ -140,7 +140,7 @@ services:
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - NVIDIA_VISIBLE_DEVICES=0
     ports:
-      - "${BRAIN_PORT:-8080}:8080"
+      - "${BRAIN_PORT:-8081}:8001"
     volumes:
       - ./ui:/app/ui
       - ./data/archive:/app/data/archive
@@ -148,7 +148,7 @@ services:
       - archive-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -165,7 +165,7 @@ services:
     image: archive-ai/sandbox:latest
     container_name: archive-sandbox-cf
     ports:
-      - "127.0.0.1:8003:8000"
+      - "127.0.0.1:${SANDBOX_PORT:-8003}:8000"
     networks:
       - archive-net
     restart: unless-stopped
@@ -191,7 +191,7 @@ services:
       - TTS_DEVICE=cpu
       - TTS_MODEL_CACHE=/models/cache
     ports:
-      - "127.0.0.1:8001:8001"
+      - "127.0.0.1:${VOICE_PORT:-8001}:8001"
     volumes:
       - ./models/whisper:/root/.cache/huggingface
       - ./models/f5-tts:/models/cache
@@ -222,6 +222,15 @@ services:
         limits:
           cpus: '2.0'
           memory: 4G
+
+  bifrost:
+    image: maximhq/bifrost:latest
+    container_name: archive-bifrost-cf
+    ports:
+      - "8080:8080"
+    networks:
+      - archive-net
+    restart: unless-stopped
 
 networks:
   archive-net:

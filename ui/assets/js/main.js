@@ -1,134 +1,225 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Element Selectors ---
-    const sessionList = document.getElementById('session-list');
-    const chatLog = document.getElementById('chat-log');
-    const messageInput = document.getElementById('B-01');
-    const sendButton = document.getElementById('B-02');
-    const stopButton = document.getElementById('B-03');
-    const inspectorTabBar = document.querySelector('#right-inspect .tab-bar');
-    const inspectorPanels = document.querySelectorAll('#inspector-content .tab-panel');
+const API_BASE = 'http://localhost:8081';
+let currentMode = 'chat';
 
-    // --- Event Listeners ---
+// DOM elements
+const chatContainer = document.getElementById('chatContainer');
+const userInput = document.getElementById('userInput');
+const sendBtn = document.getElementById('sendBtn');
+const toolUsageDiv = document.getElementById('toolUsage');
+const modeBtns = document.querySelectorAll('.mode-btn');
 
-    // 1. Right Inspector Tab Switching
-    if (inspectorTabBar) {
-        inspectorTabBar.addEventListener('click', (e) => {
-            if (e.target.matches('.tab-button')) {
-                const targetTab = e.target;
-                const targetPanelId = targetTab.id.replace('R-', 'panel-');
-
-                // Update tab buttons
-                inspectorTabBar.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-                targetTab.classList.add('active');
-
-                // Update tab panels
-                // In a real app, you'd show the corresponding panel. For now, we'll just log it.
-                console.log(`Switching to tab: ${targetTab.id}`);
-                
-                // This is a placeholder for showing the correct panel
-                // inspectorPanels.forEach(panel => panel.classList.remove('active'));
-                // document.getElementById(targetPanelId).classList.add('active');
-            }
-        });
-    }
-
-    // 2. Left Nav Session Selection
-    if (sessionList) {
-        sessionList.addEventListener('click', (e) => {
-            if (e.target.closest('.session-item')) {
-                sessionList.querySelectorAll('.session-item').forEach(item => item.classList.remove('active'));
-                e.target.closest('.session-item').classList.add('active');
-            }
-        });
-    }
-
-    // 3. Message Sending
-    const sendMessage = () => {
-        const text = messageInput.value.trim();
-        if (!text) {
-            return;
-        }
-
-        // Add user message to log
-        addMessageToLog(text, 'user');
-        messageInput.value = '';
-
-        // --- Backend API call would go here ---
-
-        // Simulate agent response
-        toggleGeneratingState(true);
-        setTimeout(() => {
-            const simulatedResponse = `This is a simulated agent response to "${text}".`;
-            addMessageToLog(simulatedResponse, 'agent');
-            toggleGeneratingState(false);
-        }, 1500);
-    };
-
-    if (sendButton) sendButton.addEventListener('click', sendMessage);
-    if (messageInput) messageInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            sendMessage();
-        }
+// Mode selection
+modeBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        currentMode = btn.dataset.mode;
+        modeBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        const modeNames = {
+            'chat': 'Chat',
+            'verify': 'Verified',
+            'agent': 'Basic Agent',
+            'advanced': 'Advanced'
+        };
+        document.getElementById('currentMode').textContent = modeNames[currentMode];
     });
+});
 
-    // 4. Stop Generation
-    if (stopButton) {
-        stopButton.addEventListener('click', () => {
-            // In a real app, this would abort the fetch request to the backend
-            console.log('Generation stopped.');
-            toggleGeneratingState(false);
+// Input handlers
+userInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') sendMessage();
+});
+sendBtn.addEventListener('click', sendMessage);
+
+// Quick actions
+document.getElementById('timeBtn').addEventListener('click', () => {
+    userInput.value = 'What is the current date and time?';
+    sendMessage();
+});
+
+document.getElementById('calcBtn').addEventListener('click', () => {
+    userInput.value = 'Calculate 123 * 456';
+    sendMessage();
+});
+
+document.getElementById('clearBtn').addEventListener('click', () => {
+    chatContainer.textContent = '';
+    const sysMsg = createMessage('Chat cleared. Start a new conversation!', 'system');
+    chatContainer.appendChild(sysMsg);
+    toolUsageDiv.textContent = '';
+    const chip = document.createElement('span');
+    chip.className = 'tool-chip';
+    chip.textContent = 'No tools used';
+    toolUsageDiv.appendChild(chip);
+});
+
+function createMessage(content, type) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message message-${type}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.textContent = content;
+    
+    msgDiv.appendChild(contentDiv);
+    return msgDiv;
+}
+
+function createAgentMessage(response, data) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = 'message message-agent';
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.textContent = response;
+    msgDiv.appendChild(contentDiv);
+
+    if (data.steps && data.steps.length > 0) {
+        const stepsDiv = document.createElement('div');
+        stepsDiv.className = 'reasoning-steps';
+        
+        const title = document.createElement('strong');
+        title.textContent = 'Reasoning Process:';
+        stepsDiv.appendChild(title);
+
+        const toolsUsed = new Set();
+
+        data.steps.forEach(step => {
+            const stepDiv = document.createElement('div');
+            stepDiv.className = 'step';
+
+            const header = document.createElement('div');
+            header.className = 'step-header';
+            header.textContent = `Step ${step.step_number}`;
+            stepDiv.appendChild(header);
+
+            const thought = document.createElement('div');
+            thought.className = 'step-detail';
+            const thoughtLabel = document.createElement('span');
+            thoughtLabel.className = 'step-label';
+            thoughtLabel.textContent = 'Thought: ';
+            thought.appendChild(thoughtLabel);
+            thought.appendChild(document.createTextNode(step.thought));
+            stepDiv.appendChild(thought);
+
+            if (step.action && step.action !== 'Final Answer') {
+                const action = document.createElement('div');
+                action.className = 'step-detail';
+                const actionLabel = document.createElement('span');
+                actionLabel.className = 'step-label';
+                actionLabel.textContent = 'Action: ';
+                action.appendChild(actionLabel);
+                action.appendChild(document.createTextNode(step.action));
+                
+                const badge = document.createElement('span');
+                badge.className = 'tool-badge';
+                badge.textContent = step.action;
+                action.appendChild(badge);
+                
+                stepDiv.appendChild(action);
+                toolsUsed.add(step.action);
+            }
+
+            if (step.action_input) {
+                const input = document.createElement('div');
+                input.className = 'step-detail';
+                const inputLabel = document.createElement('span');
+                inputLabel.className = 'step-label';
+                inputLabel.textContent = 'Input: ';
+                input.appendChild(inputLabel);
+                input.appendChild(document.createTextNode(step.action_input));
+                stepDiv.appendChild(input);
+            }
+
+            if (step.observation) {
+                const obs = document.createElement('div');
+                obs.className = 'step-detail';
+                const obsLabel = document.createElement('span');
+                obsLabel.className = 'step-label';
+                obsLabel.textContent = 'Result: ';
+                obs.appendChild(obsLabel);
+                obs.appendChild(document.createTextNode(step.observation));
+                stepDiv.appendChild(obs);
+            }
+
+            stepsDiv.appendChild(stepDiv);
         });
+
+        msgDiv.appendChild(stepsDiv);
+
+        if (toolsUsed.size > 0) {
+            updateToolUsage(Array.from(toolsUsed));
+        }
     }
 
+    return msgDiv;
+}
 
-    // --- Helper Functions ---
+function updateToolUsage(tools) {
+    toolUsageDiv.textContent = '';
+    tools.forEach(tool => {
+        const chip = document.createElement('span');
+        chip.className = 'tool-chip';
+        chip.textContent = tool;
+        toolUsageDiv.appendChild(chip);
+    });
+}
 
-    /**
-     * Toggles the UI between generating and idle states.
-     * @param {boolean} isGenerating - True if generation is starting, false if ending.
-     */
-    const toggleGeneratingState = (isGenerating) => {
-        if (sendButton && stopButton) {
-            sendButton.style.display = isGenerating ? 'none' : 'block';
-            stopButton.style.display = isGenerating ? 'block' : 'none';
+async function sendMessage() {
+    const message = userInput.value.trim();
+    if (!message) return;
+
+    chatContainer.appendChild(createMessage(message, 'user'));
+    userInput.value = '';
+
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Thinking...';
+
+    try {
+        let endpoint, payload;
+        switch(currentMode) {
+            case 'chat':
+                endpoint = '/chat';
+                payload = { message };
+                break;
+            case 'verify':
+                endpoint = '/verify';
+                payload = { message };
+                break;
+            case 'agent':
+                endpoint = '/agent';
+                payload = { question: message, max_steps: 10 };
+                break;
+            case 'advanced':
+                endpoint = '/agent/advanced';
+                payload = { question: message, max_steps: 10 };
+                break;
         }
-        messageInput.disabled = isGenerating;
-    };
 
-    /**
-     * Adds a message to the chat log.
-     * @param {string} text - The message content.
-     * @param {'user' | 'agent'} sender - The sender of the message.
-     */
-    const addMessageToLog = (text, sender) => {
-        if (!chatLog) return;
+        const response = await fetch(API_BASE + endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-        const messageDiv = document.createElement('div');
-        messageDiv.className = `message message-${sender}`;
+        const data = await response.json();
 
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'message-content';
-        
-        const p = document.createElement('p');
-        p.textContent = text;
-        contentDiv.appendChild(p);
-
-        // Add action buttons for agent messages
-        if (sender === 'agent') {
-            const actionsDiv = document.createElement('div');
-            actionsDiv.className = 'message-actions';
-            actionsDiv.innerHTML = `
-                <button class="inline-button">Copy</button>
-                <button class="inline-button">Regenerate</button>
-            `;
-            contentDiv.appendChild(actionsDiv);
+        if (currentMode === 'chat') {
+            chatContainer.appendChild(createMessage(data.response, 'agent'));
+        } else if (currentMode === 'verify') {
+            chatContainer.appendChild(createMessage(data.final_response, 'agent'));
+        } else {
+            chatContainer.appendChild(createAgentMessage(data.answer || 'Task completed!', data));
         }
-        
-        messageDiv.appendChild(contentDiv);
-        chatLog.appendChild(messageDiv);
 
-        // Scroll to the bottom
-        chatLog.scrollTop = chatLog.scrollHeight;
-    };
+    } catch (error) {
+        chatContainer.appendChild(createMessage('Error: ' + error.message, 'system'));
+    }
 
-});
+    sendBtn.disabled = false;
+    sendBtn.textContent = 'Send';
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+    userInput.focus();
+}
+
+userInput.focus();

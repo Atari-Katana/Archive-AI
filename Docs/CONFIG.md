@@ -66,30 +66,28 @@ nano config/user-config.env  # Edit tuning parameters
 - `ASYNC_MEMORY`: `true/false` to enable background memory worker.
 - `MEMORY_START_FROM_LATEST`: `true/false` start reading Redis stream from latest (`$`) when no saved ID.
 - `MEMORY_LAST_ID_KEY`: Redis key to persist last processed stream ID.
+- `MAX_TOKENS`: Maximum number of tokens for LLM responses (default: 1024).
 
 ---
 
-## How go.sh Works
+## How ./start Works
 
-The `go.sh` script is the **one-command launcher** for Archive-AI in dual-engine mode:
+The `./start` script is the **master launcher** for Archive-AI:
 
-1. **Applies AWQ Overlay:** Merges `docker-compose.yml` + `docker-compose.awq-7b.yml`
-2. **Starts Services:** Launches Redis, Vorpal (AWQ 7B), Goblin (7B GGUF), Brain, Voice, Librarian
-3. **Launches Web UI:** Automatically starts UI server on port 8888
-4. **Handles Cleanup:** Gracefully stops all services on exit (Ctrl+C)
+1. **Checks Dependencies:** Ensures Docker, Python, etc., are installed.
+2. **Checks Models:** Auto-downloads Goblin model if missing.
+3. **Applies Overlays:** Merges `docker-compose.yml` + `docker-compose.awq-7b.yml`.
+4. **Starts Services:** Launches Redis, Vorpal, Goblin, Brain, Voice, Librarian.
+5. **Launches Interface:** Starts Web UI (8888) or Flutter GUI based on selection.
+6. **Handles Cleanup:** Gracefully stops all services on exit (Ctrl+C).
 
 **Usage:**
 ```bash
-bash go.sh              # Start everything with AWQ 7B mode
-# Press Ctrl+C to stop all services and UI
+./start              # Interactive menu
+./start --web        # Web UI
+./start --gui        # Flutter GUI
+./start --api        # Headless
 ```
-
-**What it does:**
-- Sets `EXTRA_COMPOSE_FILE=docker-compose.awq-7b.yml` environment variable
-- Calls `scripts/start.sh` which handles pre-flight checks and service startup
-- Starts UI server in background (`python3 -m http.server 8888`)
-- Waits for UI server (blocking)
-- On exit: kills UI server and runs `docker-compose down`
 
 ---
 
@@ -99,20 +97,18 @@ bash go.sh              # Start everything with AWQ 7B mode
 1. Environment variables in your shell
 2. `config/user-config.env` (if present)
 3. `.env` file (required)
-4. `docker-compose.awq-7b.yml` overlay (when using `go.sh`)
+4. `docker-compose.awq-7b.yml` overlay (always used by ./start)
 5. `docker-compose.yml` base configuration
 
 **Flow:**
-- `go.sh` runs `scripts/start.sh` with `EXTRA_COMPOSE_FILE=docker-compose.awq-7b.yml`
-- `scripts/start.sh` exports values from `config/user-config.env` (if it exists)
-- Docker Compose merges base config + AWQ overlay + environment variables
-- Services start with final merged configuration
+- `./start` calls `docker-compose` with both files.
+- Services start with final merged configuration.
 
 ---
 
 ## When to Use Each Mode
 
-### Use Dual-Engine (AWQ 7B) - `bash go.sh`
+### Standard Mode (Dual-Engine) - `./start`
 **Best for:**
 - 16GB+ VRAM GPUs (RTX 5060 Ti, 4060 Ti 16GB, 3090, 4090)
 - Full Archive-AI experience (speed + reasoning)
@@ -140,17 +136,17 @@ bash go.sh              # Start everything with AWQ 7B mode
 
 ## Switching Between Modes
 
-**From Dual-Engine to Single-Engine:**
+**From Dual-Engine to Single-Engine (Manual):**
 ```bash
-# Stop go.sh (Ctrl+C)
+# Stop current session (Ctrl+C)
 docker-compose down
-docker-compose up -d redis vorpal brain  # Start minimal services
+docker-compose up -d redis vorpal brain  # Start minimal services manually
 ```
 
-**From Single-Engine to Dual-Engine:**
+**From Single-Engine to Dual-Engine (Standard):**
 ```bash
 docker-compose down
-bash go.sh  # Launches with AWQ overlay
+./start  # Launches with AWQ overlay and UI
 ```
 
 ---

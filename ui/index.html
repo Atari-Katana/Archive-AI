@@ -3,90 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Archive-AI | ClaraGPT Console</title>
+    <title>Archive-AI - Intelligent Agent Interface</title>
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cormorant+Garamond:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="app-shell">
-        <!-- Z1: CREST (Top Medallion) -->
-        <header id="crest">
-            <div class="crest-medallion" role="button" aria-label="Open global menu">
-                <!-- C-01 to C-04 are in a menu opened by this button -->
+    <div class="container">
+        <div class="main-panel">
+            <div class="header">
+                <h1>Archive-AI</h1>
+                <p>Intelligent Agent with Reasoning & Tool Use</p>
             </div>
-        </header>
 
-        <!-- Z3: LEFT_NAV (Sessions & Navigation) -->
-        <nav id="left-nav" class="panel">
-            <div class="panel-header">
-                <button id="L-01" class="nav-button">New Session</button>
-            </div>
-            <div class="panel-content" id="session-list">
-                <!-- L-02: Session Items will be populated here -->
-                <div class="session-item active" role="button">
-                    <span>Active Conversation</span>
-                    <!-- L-03 & L-04 actions would be in a context menu -->
-                </div>
-                <div class="session-item" role="button">
-                    <span>Archived Chat Log</span>
-                </div>
-            </div>
-        </nav>
-
-        <!-- Z2: MAIN_VIEW (Primary Content) -->
-        <main id="main-view" class="panel">
-            <div class="panel-content" id="chat-log">
-                <!-- Messages will appear here -->
-                <div class="message message-agent">
+            <div class="chat-container" id="chatContainer">
+                <div class="message message-system">
                     <div class="message-content">
-                        <p>Welcome to the Archive-AI console. How may I assist you?</p>
-                        <div class="message-actions">
-                            <button id="M-01" class="inline-button">Copy</button>
-                            <button id="M-02" class="inline-button">Regenerate</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="message message-user">
-                    <div class="message-content">
-                        <p>This is a user message placeholder.</p>
+                        Welcome to Archive-AI! I can help with calculations, data analysis, time queries, and more. Try asking me something!
                     </div>
                 </div>
             </div>
-        </main>
 
-        <!-- Z4: RIGHT_INSPECT (Inspector Panel) -->
-        <aside id="right-inspect" class="panel">
-            <div class="panel-header tab-bar">
-                <button id="R-01" class="tab-button active" role="tab">Memory</button>
-                <button id="R-02" class="tab-button" role="tab">Sources</button>
-                <button id="R-03" class="tab-button" role="tab">Tools</button>
-                <button id="R-04" class="tab-button" role="tab">Settings</button>
-            </div>
-            <div class="panel-content" id="inspector-content">
-                <!-- Content for the active tab will be shown here -->
-                <div class="tab-panel active">
-                    <p>Active memory context appears here.</p>
+            <div class="input-container">
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="chat">Chat</button>
+                    <button class="mode-btn" data-mode="verify">Verified</button>
+                    <button class="mode-btn" data-mode="agent">Basic Agent</button>
+                    <button class="mode-btn" data-mode="advanced">Advanced</button>
+                </div>
+                <div class="input-wrapper">
+                    <input type="text" class="input-box" id="userInput" placeholder="Type your message...">
+                    <button class="send-btn" id="sendBtn">Send</button>
                 </div>
             </div>
-        </aside>
+        </div>
 
-        <!-- Z5: BOTTOM_INPUT (Input & Actions) -->
-        <footer id="bottom-input">
-            <button id="B-04" class="input-action-button" aria-label="Attach file">📎</button>
-            <div class="input-wrapper">
-                <input type="text" id="B-01" placeholder="Converse with the Archive...">
-                <div id="B-05" class="mode-toggle">
-                    <button class="toggle-option active">Chat</button>
-                    <button class="toggle-option">Read</button>
-                    <button class="toggle-option">Build</button>
+        <div class="sidebar">
+            <div class="panel">
+                <h2>System Status</h2>
+                <div class="status-item">
+                    <span class="status-label">Brain API</span>
+                    <span class="status-value">
+                        <span class="status-indicator"></span>
+                        <span id="apiStatus">Online</span>
+                    </span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">LLM Model</span>
+                    <span class="status-value">Qwen 2.5-3B</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Available Tools</span>
+                    <span class="status-value">11 tools</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-label">Mode</span>
+                    <span class="status-value" id="currentMode">Chat</span>
                 </div>
             </div>
-            <button id="B-02" class="input-action-button send-button" aria-label="Send message">➤</button>
-            <button id="B-03" class="input-action-button stop-button" aria-label="Stop generation" style="display: none;">■</button>
-        </footer>
+
+            <div class="panel">
+                <h2>Recent Tools</h2>
+                <div class="tool-usage" id="toolUsage">
+                    <span class="tool-chip">No tools used</span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2>Quick Actions</h2>
+                <button class="action-btn" id="timeBtn">Get Current Time</button>
+                <button class="action-btn" id="calcBtn">Quick Calculation</button>
+                <button class="action-btn" id="clearBtn">Clear Chat</button>
+            </div>
+        </div>
     </div>
-    <script src="assets/js/main.js"></script>
+
+    <script src="assets/js/main.js?v=7.5.1"></script>
 </body>
 </html>

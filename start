@@ -1,0 +1,245 @@
+#!/bin/bash
+#
+# Archive-AI Master Start Script
+# Orchestrates services, interfaces, and graceful shutdowns.
+#
+# Usage:
+#   ./start           # Interactive menu
+#   ./start --web     # Start with Web UI
+#   ./start --gui     # Start with Flutter GUI
+#   ./start --api     # Start headless (API only)
+#
+
+set -e
+
+# ==============================================================================
+# Configuration
+# ==============================================================================
+
+ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
+COMPOSE_FILES="-f docker-compose.yml -f docker-compose.awq-7b.yml"
+WEB_UI_PORT=8888
+FLUTTER_DIR="$ROOT_DIR/ui/flutter_ui"
+
+# ANSI Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# State tracking
+UI_PID=""
+
+# ==============================================================================
+# Helper Functions
+# ==============================================================================
+
+print_header() {
+    echo -e "\n${BLUE}${BOLD}======================================================================${NC}"
+    echo -e "${BLUE}${BOLD}   $1${NC}"
+    echo -e "${BLUE}${BOLD}======================================================================${NC}\n"
+}
+
+log_info() {
+    echo -e "${CYAN}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[OK]${NC}   $1"
+}
+
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERR]${NC}  $1"
+}
+
+check_dependencies() {
+    log_info "Checking system dependencies..."
+    
+    if ! command -v docker &> /dev/null; then
+        log_error "Docker is not installed."
+        exit 1
+    fi
+    
+    if ! command -v docker-compose &> /dev/null; then
+        log_error "Docker Compose is not installed."
+        exit 1
+    fi
+
+    if ! command -v python3 &> /dev/null; then
+        log_error "Python3 is not installed."
+        exit 1
+    fi
+
+    log_success "All system dependencies met."
+}
+
+# ==============================================================================
+# Service Management
+# ==============================================================================
+
+start_services() {
+    print_header "Starting Backend Services (Docker)"
+    
+    # Check for models
+    if [ ! -f "$ROOT_DIR/models/goblin/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf" ]; then
+        log_warn "Goblin model missing. Initiating auto-download..."
+        python3 "$ROOT_DIR/scripts/download-models.py" --model goblin-7b
+    fi
+
+    log_info "Spinning up containers (Redis, Vorpal, Goblin, Brain, etc.)..."
+    log_info "Configuration: Dual-Engine (AWQ + 7B)"
+    
+    if docker-compose $COMPOSE_FILES up -d; then
+        log_success "Docker services started successfully."
+    else
+        log_error "Failed to start Docker services."
+        exit 1
+    fi
+
+    log_info "Waiting for services to initialize..."
+    sleep 3
+    
+    # Quick health check
+    if curl -s http://localhost:8081/health > /dev/null; then
+        log_success "Brain API is responsive at http://localhost:8081"
+    else
+        log_warn "Brain API is starting up (health check pending)..."
+    fi
+}
+
+stop_services() {
+    print_header "Shutdown Sequence"
+    
+    if [ -n "$UI_PID" ]; then
+        log_info "Stopping UI process (PID: $UI_PID)..."
+        kill "$UI_PID" 2>/dev/null || true
+    fi
+
+    log_info "Stopping Docker services..."
+    docker-compose $COMPOSE_FILES down
+    
+    log_success "System shutdown complete. Goodbye!"
+    exit 0
+}
+
+# Trap signals for graceful shutdown
+trap stop_services SIGINT SIGTERM EXIT
+
+# ==============================================================================
+# Interface Launchers
+# ==============================================================================
+
+start_web_ui() {
+    print_header "Launching Web Interface"
+    
+    cd "$ROOT_DIR/ui"
+    log_info "Serving Web UI on port $WEB_UI_PORT..."
+    
+    # Start python server in background
+    python3 -m http.server $WEB_UI_PORT &
+    UI_PID=$!
+    
+    log_success "Web UI is live at: http://localhost:$WEB_UI_PORT"
+    log_info "Metrics Dashboard: http://localhost:8081/ui/metrics-panel.html"
+    log_info "Config Panel:      http://localhost:8081/ui/config-panel.html"
+    
+    # Keep script running
+    wait "$UI_PID"
+}
+
+start_flutter_gui() {
+    print_header "Launching Flutter GUI"
+    
+    if ! command -v flutter &> /dev/null; then
+        log_error "Flutter is not installed or not in PATH."
+        log_info "Please install Flutter or use the Web UI."
+        exit 1
+    fi
+
+    if [ ! -d "$FLUTTER_DIR" ]; then
+        log_error "Flutter project not found at $FLUTTER_DIR"
+        exit 1
+    fi
+
+    cd "$FLUTTER_DIR"
+    log_info "Running Flutter app (Linux Desktop)..."
+    
+    # Start Flutter in release mode for performance, or debug if needed
+    flutter run -d linux &
+    UI_PID=$!
+    
+    log_success "Flutter application launched."
+    
+    # Keep script running
+    wait "$UI_PID"
+}
+
+start_headless() {
+    print_header "Headless Mode"
+    
+    log_success "Services are running in background."
+    log_info "API available at: http://localhost:8081"
+    log_info "Press Ctrl+C to stop services and exit."
+    
+    # Infinite wait
+    tail -f /dev/null
+}
+
+# ==============================================================================
+# Main Execution Flow
+# ==============================================================================
+
+# 1. Preliminaries
+check_dependencies
+
+# 2. Argument Parsing
+MODE=""
+case "$1" in
+    --web) MODE="web" ;; 
+    --gui) MODE="gui" ;; 
+    --api) MODE="api" ;; 
+    --help) 
+        echo "Usage: ./start [--web | --gui | --api]"
+        exit 0 
+        ;; 
+esac
+
+# 3. Interactive Menu (if no arg provided)
+if [ -z "$MODE" ]; then
+    print_header "Archive-AI Launcher"
+    echo -e "Select an interface mode:"
+    echo -e "  ${BOLD}1)${NC} Web UI (Browser-based, recommended)"
+    echo -e "  ${BOLD}2)${NC} Flutter GUI (Desktop App, requires Flutter)"
+    echo -e "  ${BOLD}3)${NC} Headless (API Only)"
+    echo -e "  ${BOLD}q)${NC} Quit"
+    echo ""
+    read -p "Enter choice [1-3]: " choice
+
+    case "$choice" in
+        1) MODE="web" ;; 
+        2) MODE="gui" ;; 
+        3) MODE="api" ;; 
+        q|Q) exit 0 ;; 
+        *) 
+            log_error "Invalid choice."
+            exit 1 
+            ;; 
+    esac
+fi
+
+# 4. Start Infrastructure
+start_services
+
+# 5. Launch Selected Interface
+case "$MODE" in
+    web) start_web_ui ;; 
+    gui) start_flutter_gui ;; 
+    api) start_headless ;; 
+esac

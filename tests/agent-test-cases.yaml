@@ -217,8 +217,8 @@ test_cases:
   - id: "ambig-003"
     name: "Time Awareness"
     question: "What year is it right now?"
+    expected_answer: "2026"
     expected_tools: ["DateTime"]
-    expected_answer: "2025"
     difficulty: "easy"
     category: "reasoning"
 

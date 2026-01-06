@@ -1,0 +1,13 @@
+tunnel: fb082968-b56a-4dba-a2a9-e1e7264e27b7
+
+ingress:
+  # Main domain
+  - hostname: archive.newvictoria.org
+    service: http://localhost:8080
+
+  # Optional: www subdomain
+  - hostname: www.archive.newvictoria.org
+    service: http://localhost:8080
+
+  # Catch-all (required, must be last)
+  - service: http_status:404

@@ -192,7 +192,7 @@ Question: {question}
         payload = {
             "model": config.VORPAL_MODEL,
             "prompt": prompt,
-            "max_tokens": 256,
+            "max_tokens": config.MAX_TOKENS,
             "temperature": 0.7,
             "stop": ["Observation:"]  # Stop before observation
         }

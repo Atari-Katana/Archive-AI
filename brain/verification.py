@@ -59,7 +59,7 @@ class ChainOfVerification:
         payload = {
             "model": config.VORPAL_MODEL,
             "prompt": prompt,
-            "max_tokens": 256,
+            "max_tokens": config.MAX_TOKENS,
             "temperature": 0.7
         }
 
@@ -194,7 +194,7 @@ Provide the final answer (corrected if needed):"""
         payload = {
             "model": config.VORPAL_MODEL,
             "prompt": revision_prompt,
-            "max_tokens": 300,
+            "max_tokens": config.MAX_TOKENS,
             "temperature": 0.5
         }
 

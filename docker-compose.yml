@@ -7,8 +7,8 @@ services:
     environment:
       - REDIS_ARGS=--maxmemory 20gb --maxmemory-policy allkeys-lru --appendonly yes --protected-mode no
     ports:
-      - "6379:6379"      # Redis
-      - "8002:8001"      # RedisInsight UI
+      - "${REDIS_PORT:-6379}:6379"      # Redis
+      - "${REDIS_UI_PORT:-8002}:8001"      # RedisInsight UI
     volumes:
       - ./data/redis:/data
     deploy:
@@ -26,7 +26,7 @@ services:
       - GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.60}  # ~9.6GB (Goblin on CPU now)
       - CUDA_VISIBLE_DEVICES=0
     ports:
-      - "8000:8000"
+      - "${VORPAL_PORT:-8000}:8000"
     volumes:
       - ./models/vorpal:/models
     networks:
@@ -59,7 +59,7 @@ services:
       - HOST=0.0.0.0
       - PORT=8080
     ports:
-      - "8081:8080"  # Map to 8081 externally (brain uses 8080)
+      - "${GOBLIN_PORT:-8082}:8080"  # Map to 8082 externally (brain uses 8081)
     volumes:
       - ./models/goblin:/models
     networks:
@@ -105,7 +105,7 @@ services:
       - ASYNC_MEMORY=true  # Enabled in Chunk 2.3
       - NVIDIA_VISIBLE_DEVICES=0  # Access for monitoring only
     ports:
-      - "8080:8080"
+      - "${BRAIN_PORT:-8081}:8080"
     volumes:
       - ./ui:/app/ui  # Mount UI files for static serving
     networks:
@@ -123,7 +123,7 @@ services:
     build: ./sandbox
     image: archive-ai/sandbox:latest
     ports:
-      - "8003:8000"
+      - "${SANDBOX_PORT:-8003}:8000"
     networks:
       - archive-net
     restart: unless-stopped
@@ -139,7 +139,7 @@ services:
       - TTS_DEVICE=cpu  # cpu or cuda
       - TTS_MODEL_CACHE=/models/cache
     ports:
-      - "8001:8001"
+      - "${VOICE_PORT:-8001}:8001"
     volumes:
       - ./models/whisper:/root/.cache/huggingface  # Cache for Whisper models
       - ./models/f5-tts:/models/cache  # F5-TTS models cache
@@ -157,7 +157,16 @@ services:
       - archive-net
     restart: unless-stopped
 
-  # 7. MCP Server for Autonomous Agents (DISABLED - not implemented)
+  # 7. Bifrost Gateway
+  bifrost:
+    image: maximhq/bifrost:latest
+    ports:
+      - "8080:8080"
+    networks:
+      - archive-net
+    restart: unless-stopped
+
+  # 8. MCP Server for Autonomous Agents (DISABLED - not implemented)
   # mcp-server:
   #   build: ./mcp-server
   #   image: archive-ai/mcp-server:latest

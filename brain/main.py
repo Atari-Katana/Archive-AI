@@ -26,7 +26,6 @@ from workers.memory_worker import memory_worker
 from verification import ChainOfVerification
 from agents import ReActAgent, ToolRegistry, AgentStep, get_basic_tools, get_advanced_tools
 from memory.vector_store import vector_store
-from router import SemanticRouter, Intent
 from metrics_collector import router as metrics_router, collector
 from config_api import router as config_router
 
@@ -105,8 +104,6 @@ if ui_path.exists():
 worker_task = None
 # Startup time for uptime calculation
 startup_time = time.time()
-# Semantic router for intent classification
-semantic_router = SemanticRouter()
 
 # Configure logging
 def setup_logging():
@@ -644,13 +641,10 @@ async def get_metrics() -> MetricsResponse:
 @app.post("/chat", response_model=ChatResponse, tags=["core"])
 async def chat(request: ChatRequest) -> ChatResponse:
     """
-    Direct LLM conversation with semantic routing
+    Direct LLM conversation with Bifrost semantic routing.
 
-    Send a message and receive a response. The system intelligently routes your
-    message based on intent:
-    - **Memory Search**: Queries like "what did I say about..." automatically search memories
-    - **Help**: Questions like "what can you do?" return guidance
-    - **Chat**: Regular conversation uses the Vorpal engine
+    Sends a message to the Bifrost gateway, which routes it to the best-fit
+    LLM provider.
 
     Messages are captured in Redis streams and may be stored in the vector
     store if they have high surprise scores (>= 0.7).
@@ -666,7 +660,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     ```json
     {
         "response": "The capital of France is Paris.",
-        "engine": "vorpal"
+        "engine": "bifrost"
     }
     ```
 
@@ -682,98 +676,23 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # Capture input to Redis Stream (non-blocking, fire and forget)
     await stream_handler.capture_input(request.message)
 
-    # Route message to detect intent
-    routing_result = semantic_router.route(request.message)
-    intent = routing_result["intent"]
-    confidence = routing_result["confidence"]
+    logger.info(f"Routing message to Bifrost")
 
-    logger.info(f"Routed message to intent={intent.value} (confidence={confidence:.2f})")
-
-    # Handle SEARCH_MEMORY intent
-    if intent == Intent.SEARCH_MEMORY:
-        query = routing_result.get("params", {}).get("query", request.message)
-        try:
-            # Search memories using vector similarity
-            results = vector_store.search_similar(
-                query_text=query,
-                top_k=5,
-                session_id=None
-            )
-
-            if not results:
-                response_text = "I couldn't find any relevant memories for that query."
-            else:
-                # Format memory results into a readable response
-                response_parts = ["I found these relevant memories:\n"]
-                for i, mem in enumerate(results, 1):
-                    # Truncate long messages
-                    msg_preview = mem['message'][:100]
-                    if len(mem['message']) > 100:
-                        msg_preview += "..."
-                    response_parts.append(
-                        f"{i}. {msg_preview} (similarity: {mem['similarity_score']:.2f})"
-                    )
-
-                response_text = "\n".join(response_parts)
-
-            return ChatResponse(
-                response=response_text,
-                engine="memory-search"
-            )
-
-        except Exception as e:
-            logger.error(f"Memory search error: {e}")
-            return ChatResponse(
-                response=f"Sorry, I encountered an error searching memories: {str(e)}",
-                engine="memory-search"
-            )
-
-    # Handle HELP intent
-    elif intent == Intent.HELP:
-        help_text = """I'm Archive-AI, your local AI companion with permanent memory.
-
-Here's what I can do:
-
-**Chat Modes:**
-• Chat - Regular conversation (fast, Vorpal engine)
-• Verified - Chain of Verification for accuracy
-• Basic Agent - ReAct agent with basic tools
-• Advanced - ReAct agent with advanced tools
-
-**Memory System:**
-• I automatically remember surprising conversations
-• Search memories with queries like "what did I say about Python?"
-• Browse all memories in the sidebar
-
-**Commands:**
-• Just ask questions naturally
-• Memory searches are automatic when you ask about past conversations
-• Use the mode buttons to switch between chat types
-
-Try asking me something or searching your memories!"""
-
-        return ChatResponse(
-            response=help_text,
-            engine="help"
-        )
-
-    # Handle CHAT intent (default)
     try:
-        # Proxy request to Vorpal (vLLM OpenAI-compatible API)
+        # Proxy request to Bifrost (OpenAI-compatible API)
         async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
-            # Use chat completions API for better conversational responses
-            vorpal_payload = {
-                "model": config.VORPAL_MODEL,
+            bifrost_payload = {
+                "model": "bifrost",  # Bifrost will route this
                 "messages": [
                     {"role": "user", "content": request.message}
                 ],
-                "max_tokens": 256,
+                "max_tokens": config.MAX_TOKENS,
                 "temperature": 0.7
             }
 
             response = await client.post(
-                f"{config.VORPAL_URL}/v1/chat/completions",
-                json=vorpal_payload
+                f"{config.BIFROST_URL}/v1/chat/completions",
+                json=bifrost_payload
             )
             response.raise_for_status()
             result = response.json()
@@ -785,13 +704,13 @@ Try asking me something or searching your memories!"""
 
             return ChatResponse(
                 response=completion_text,
-                engine="vorpal"
+                engine="bifrost"
             )
 
     except httpx.HTTPError as e:
         raise HTTPException(
             status_code=503,
-            detail=f"Vorpal engine error: {str(e)}"
+            detail=f"Bifrost gateway error: {str(e)}"
         )
 
 
@@ -1789,4 +1708,4 @@ async def search_archived_memories(query: str, max_results: int = 10):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

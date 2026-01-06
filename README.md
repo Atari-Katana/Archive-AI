@@ -62,12 +62,12 @@ cd archive-ai
 cp .env.example .env
 nano .env  # Set REDIS_PASSWORD (generate with: openssl rand -base64 32)
 
-# 3. Launch everything (models download automatically!)
-./go.sh
-# ✓ Downloads Goblin model if missing (8.4GB, resumable)
-# ✓ Starts Redis, Vorpal, Goblin, Brain, Voice, Librarian
-# ✓ Launches Web UI on http://localhost:8888
-# ✓ Press Ctrl+C to stop everything
+# 3. Launch everything
+./start
+# Follow the interactive menu:
+# 1) Web UI (Browser) - http://localhost:8888
+# 2) Flutter GUI (Desktop)
+# 3) Headless (API Only) - http://localhost:8081
 
 # 4. Verify health
 bash scripts/health-check.sh
@@ -78,19 +78,19 @@ bash scripts/health-check.sh
 - **Goblin Engine:** DeepSeek-R1-Distill-Qwen-7B (~5-6GB VRAM) for reasoning/coding
 - **Total VRAM:** ~14GB (fits 16GB GPU with 2GB headroom)
 - **Web UI:** Automatically started on port 8888
-- **Metrics Dashboard:** Real-time performance monitoring
-- **Config Panel:** Web-based configuration editor
+- **Metrics Dashboard:** Real-time performance monitoring (http://localhost:8081/ui/metrics-panel.html)
+- **Config Panel:** Web-based configuration editor (http://localhost:8081/ui/config-panel.html)
 
 ---
 
 ## 📊 Web Dashboards
 
 ### Main Interface
-- **URL:** http://localhost:8888 or http://localhost:8080/ui/index.html
+- **URL:** http://localhost:8888 or http://localhost:8081/ui/index.html
 - **Features:** Chat, memory browser, agent controls
 
 ### Performance Metrics Dashboard ✨ NEW
-- **URL:** http://localhost:8080/ui/metrics-panel.html
+- **URL:** http://localhost:8081/ui/metrics-panel.html
 - **Features:**
   - Real-time CPU, memory, request rate charts
   - Historical data (1-24 hours)
@@ -99,7 +99,7 @@ bash scripts/health-check.sh
   - Auto-refresh every 30 seconds
 
 ### Configuration Editor ✨ NEW
-- **URL:** http://localhost:8080/ui/config-panel.html
+- **URL:** http://localhost:8081/ui/config-panel.html
 - **Features:**
   - Live configuration editing
   - Pydantic validation
@@ -107,7 +107,7 @@ bash scripts/health-check.sh
   - Default reset capability
 
 ### API Documentation
-- **URL:** http://localhost:8080/docs
+- **URL:** http://localhost:8081/docs
 - **Features:** Swagger UI with live testing
 
 ---
@@ -134,6 +134,7 @@ See [CONFIG.md](Docs/CONFIG.md) for detailed configuration guide.
 | Service | Purpose | Tech Stack | Port |
 |---------|---------|------------|------|
 | **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8080 |
+| **Bifrost** | Semantic Router | `maximhq/bifrost` | (Internal) |
 | **Vorpal** | Speed Engine (LLM) | vLLM + Qwen 7B AWQ / 3B | 8000 |
 | **Goblin** | Reasoning Engine | llama.cpp + DeepSeek 7B | 8081 |
 | **Redis** | State + Vector DB | Redis Stack + RediSearch | 6379 |
@@ -144,15 +145,15 @@ See [CONFIG.md](Docs/CONFIG.md) for detailed configuration guide.
 ### Data Flow
 
 ```
-User Input → Brain → Vorpal (LLM) → Surprise Scoring → Redis
-                ↓
-         Code Validator → Execution → Response
-                ↓
-            Memory Recall ← Vector Search
-                ↓
-         Agentic Tools (Research, Code, Voice)
-                ↓
-            Response + Memory Storage → Metrics Collection
+User Input → Brain → Bifrost Gateway → Vorpal/Goblin (LLM) → Surprise Scoring → Redis
+                             ↓
+                      Code Validator → Execution → Response
+                             ↓
+                         Memory Recall ← Vector Search
+                             ↓
+                      Agentic Tools (Research, Code, Voice)
+                             ↓
+                         Response + Memory Storage → Metrics Collection
 ```
 
 ---
@@ -211,19 +212,14 @@ User Input → Brain → Vorpal (LLM) → Surprise Scoring → Redis
 
 **Start Everything:**
 ```bash
-./go.sh                          # Dual-engine mode (recommended)
-# OR
-bash scripts/start.sh            # Alternative startup script
-bash scripts/start.sh --prod     # Production mode
+./start                          # Interactive launcher (Recommended)
+./start --web                    # Start with Web UI
+./start --gui                    # Start with Flutter GUI
+./start --api                    # Start headless
 ```
 
 **Stop Everything:**
-```bash
-./shutdown.sh                    # Clean shutdown (recommended)
-# OR
-docker-compose down              # Stop all services
-docker-compose down -v           # Stop and remove volumes
-```
+Press `Ctrl+C` in the terminal where `./start` is running. The script handles graceful shutdown of all services and UIs.
 
 **Health Check:**
 ```bash
@@ -629,22 +625,20 @@ MIT License
 
 **Start Archive-AI:**
 ```bash
-./go.sh                  # Dual-engine (best, auto-downloads models)
-./shutdown.sh            # Clean shutdown
+./start                  # Interactive launcher
 ```
 
 **Access Points:**
-- **Main UI:** http://localhost:8888 or http://localhost:8080/ui/
-- **Metrics Dashboard:** http://localhost:8080/ui/metrics-panel.html ✨
-- **Config Editor:** http://localhost:8080/ui/config-panel.html ✨
-- **API Docs:** http://localhost:8080/docs
-- **Health:** http://localhost:8080/health
+- **Main UI:** http://localhost:8888 or http://localhost:8081/ui/
+- **Metrics Dashboard:** http://localhost:8081/ui/metrics-panel.html ✨
+- **Config Editor:** http://localhost:8081/ui/config-panel.html ✨
+- **API Docs:** http://localhost:8081/docs
+- **Health:** http://localhost:8081/health
 - **Redis Insight:** http://localhost:8002
 
 **Essential Commands:**
 ```bash
-./go.sh                              # Start all services
-./shutdown.sh                        # Stop all services
+./start                              # Start all services
 bash scripts/health-check.sh         # Health check
 bash scripts/run-stress-test.sh      # Stress test ✨
 bash scripts/run-edge-case-tests.sh  # Edge case tests ✨

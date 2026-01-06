@@ -409,7 +409,7 @@ class AgentStressTest:
 async def main():
     parser = argparse.ArgumentParser(description="Agent Stress Test for Archive-AI")
     parser.add_argument("--tests", type=str, default="tests/agent-test-cases.yaml", help="Path to test cases YAML file")
-    parser.add_argument("--url", type=str, default="http://localhost:8080", help="Brain API URL")
+    parser.add_argument("--url", type=str, default="http://localhost:8081", help="Brain API URL")
     args = parser.parse_args()
 
     test = AgentStressTest(test_file=args.tests, brain_url=args.url)

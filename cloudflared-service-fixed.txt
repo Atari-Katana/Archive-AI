@@ -1,0 +1,14 @@
+[Unit]
+Description=cloudflared
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+TimeoutStartSec=15
+Type=notify
+ExecStart=/usr/bin/cloudflared --config /etc/cloudflared/config.yml --no-autoupdate tunnel run --token eyJhIjoiMjVlOTM5NTBiMDYzYzM5NTUzNDhiNDI0ODVjMzRlM2IiLCJ0IjoiZmIwODI5NjgtYjU2YS00ZGJhLWEyYTktZTFlNzI2NGUyN2I3IiwicyI6IlpUazFNbVUwWm1JdE16UXlZUzAwTUdNM0xXRTVOakV0TkRBNU4yRXpNVFkwWmprMCJ9
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

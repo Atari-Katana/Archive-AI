@@ -26,7 +26,7 @@ mkdir -p data/{redis,archive,library} models/{vorpal,whisper,f5-tts} ~/ArchiveAI
 docker-compose -f docker-compose.prod.yml up -d
 
 # 6. Verify health
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 ```
 
 ---
@@ -98,7 +98,7 @@ Edit `.env` file:
 REDIS_PASSWORD=<generate with: openssl rand -base64 32>
 
 # Ports
-BRAIN_PORT=8080
+BRAIN_PORT=8081
 
 # Memory Management
 ARCHIVE_DAYS=30          # Archive memories older than 30 days
@@ -139,7 +139,7 @@ In `docker-compose.prod.yml`:
 # - 8001: Voice
 # - 8003: Sandbox
 
-# Only Brain (8080) is externally accessible
+# Only Brain (8081) is externally accessible
 # Use nginx reverse proxy with SSL:
 
 sudo apt install nginx certbot python3-certbot-nginx
@@ -159,6 +159,7 @@ sudo ufw deny 6379
 sudo ufw deny 8000
 sudo ufw deny 8001
 sudo ufw deny 8003
+# Note: 8081 is the Brain API (allow if accessing directly)
 ```
 
 ### 3. Redis Password
@@ -187,11 +188,11 @@ Already configured in `docker-compose.prod.yml`:
 docker ps --format "table {{.Names}}\t{{.Status}}"
 
 # Individual health
-curl http://localhost:8080/health
-curl http://localhost:8080/metrics
+curl http://localhost:8081/health
+curl http://localhost:8081/metrics
 
 # Archive stats
-curl http://localhost:8080/admin/archive_stats
+curl http://localhost:8081/admin/archive_stats
 ```
 
 ### Resource Usage
@@ -355,9 +356,9 @@ WHISPER_MODEL=base  # Recommended
 ## API Documentation
 
 Access interactive API docs:
-- Swagger UI: http://localhost:8080/docs
-- ReDoc: http://localhost:8080/redoc
-- OpenAPI JSON: http://localhost:8080/openapi.json
+- Swagger UI: http://localhost:8081/docs
+- ReDoc: http://localhost:8081/redoc
+- OpenAPI JSON: http://localhost:8081/openapi.json
 
 ---
 

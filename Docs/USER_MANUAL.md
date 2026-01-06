@@ -62,18 +62,16 @@ Archive-AI is your **personal AI assistant that never forgets**. Unlike cloud-ba
 1. **Start Archive-AI**:
    ```bash
    cd ~/Archive-AI
-   docker-compose up -d
+   ./start
+   # Follow the interactive menu to select your interface (Web UI or GUI)
    ```
 
 2. **Wait for Services** (first time takes ~2 minutes):
-   ```bash
-   # Check if ready
-   curl http://localhost:8080/health
-   ```
+   - The startup script will show verbose logs and check health automatically.
 
 3. **Open the Interface**:
-   - Navigate to: `http://localhost:8888`
-   - You should see the Archive-AI chat interface
+   - **Web UI:** Navigate to `http://localhost:8888`
+   - **Flutter GUI:** It will launch automatically if selected.
 
 ### Your First Conversation
 
@@ -1075,7 +1073,7 @@ docker-compose logs brain | grep -i error
 
 **API Documentation**:
 ```
-http://localhost:8080/docs
+http://localhost:8081/docs
 ```
 
 ---
