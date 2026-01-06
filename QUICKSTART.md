@@ -64,27 +64,25 @@ nano .env
 ### Step 3: Launch Everything
 
 ```bash
-./go.sh
+./start
 ```
 
-This single command will:
-- Download Goblin model if missing (DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf, ~8.4GB, resumable)
-- Start all 6 microservices (Redis, Vorpal, Goblin, Brain, Voice, Librarian)
-- Launch Web UI on http://localhost:8888
-- Load Qwen 2.5-7B-AWQ (~6GB VRAM) + DeepSeek-R1-Distill-Qwen-7B-Q4_K_M (~5-6GB VRAM)
+This master command will:
+- Check for system dependencies and models.
+- Download Goblin model if missing (DeepSeek-R1-Distill-Qwen-7B, ~8.4GB).
+- Start all backend services (Redis, Vorpal, Goblin, Brain, Voice, Librarian, Bifrost).
+- Provide an interactive menu to launch the Web UI or Flutter GUI.
 
-**First run takes 5-10 minutes** to download models. Subsequent starts take ~30 seconds.
+**First run takes 5-10 minutes** to download models. Subsequent starts are near-instant.
 
 ### Step 4: Verify Health
 
-Wait for models to load (watch terminal output), then:
+The `./start` script checks health automatically, but you can also run:
 
 ```bash
 # In a new terminal
 bash scripts/health-check.sh
 ```
-
-You should see all services reporting healthy.
 
 ---
 
@@ -94,10 +92,10 @@ Once started, you can access:
 
 | Interface | URL | Description |
 |-----------|-----|-------------|
-| **Main UI** | http://localhost:8888 | Chat interface and memory browser |
-| **Metrics Dashboard** | http://localhost:8080/ui/metrics-panel.html | Real-time performance monitoring |
-| **Config Editor** | http://localhost:8080/ui/config-panel.html | Live configuration editor |
-| **API Docs** | http://localhost:8080/docs | Interactive Swagger documentation |
+| **Main UI** | http://localhost:8888 | Modern chat interface (if started with --web) |
+| **Metrics Dashboard** | http://localhost:8081/ui/metrics-panel.html | Real-time performance monitoring |
+| **Config Editor** | http://localhost:8081/ui/config-panel.html | Live configuration editor |
+| **API Docs** | http://localhost:8081/docs | Interactive Swagger documentation |
 | **Redis Insight** | http://localhost:8002 | Database browser (optional) |
 
 ---
@@ -108,12 +106,11 @@ Once started, you can access:
 
 **Via Web UI:**
 - Open http://localhost:8888
-- Type a message in the chat box
-- Press Send
+- Type a message and press Send.
 
 **Via API:**
 ```bash
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello! What can you help me with?"}'
 ```
@@ -124,14 +121,14 @@ Archive-AI automatically stores surprising/novel information using a "Surprise S
 
 **View stored memories:**
 ```bash
-curl http://localhost:8080/memories | jq
+curl http://localhost:8081/memories | jq
 ```
 
 ### 3. Try an Agent
 
 **Research assistant with library search:**
 ```bash
-curl -X POST http://localhost:8080/research \
+curl -X POST http://localhost:8081/research \
   -H "Content-Type: application/json" \
   -d '{
     "question": "What is quantum computing?",
@@ -142,7 +139,7 @@ curl -X POST http://localhost:8080/research \
 
 **Code assistant with execution:**
 ```bash
-curl -X POST http://localhost:8080/code_assist \
+curl -X POST http://localhost:8081/code_assist \
   -H "Content-Type: application/json" \
   -d '{
     "task": "Write a function to calculate fibonacci numbers",
@@ -162,7 +159,7 @@ mkdir -p ~/ArchiveAI/Library-Drop
 cp your-document.pdf ~/ArchiveAI/Library-Drop/
 
 # Wait a few seconds for processing, then search
-curl -X POST http://localhost:8080/library/search \
+curl -X POST http://localhost:8081/library/search \
   -H "Content-Type: application/json" \
   -d '{
     "query": "your search query",
@@ -172,11 +169,10 @@ curl -X POST http://localhost:8080/library/search \
 
 ### 5. Monitor Performance
 
-Open http://localhost:8080/ui/metrics-panel.html to see:
+Open http://localhost:8081/ui/metrics-panel.html to see:
 - Real-time CPU, memory, GPU usage
 - Request rates and latency
 - Service health status
-- Historical data with charts
 
 ---
 
@@ -184,31 +180,21 @@ Open http://localhost:8080/ui/metrics-panel.html to see:
 
 **Start Archive-AI:**
 ```bash
-./go.sh
+./start
 ```
 
 **Stop Archive-AI:**
-```bash
-./shutdown.sh
-```
+Press `Ctrl+C` in the terminal where `./start` is running.
 
 **Check health:**
 ```bash
 bash scripts/health-check.sh         # Full check
-bash scripts/health-check.sh --quick # Quick check
-bash scripts/health-check.sh --watch # Continuous monitoring
 ```
 
 **View logs:**
 ```bash
 docker-compose logs -f              # All services
 docker-compose logs -f brain        # Brain only
-docker-compose logs -f vorpal       # Vorpal LLM only
-```
-
-**Restart a service:**
-```bash
-docker-compose restart brain
 ```
 
 ---
@@ -220,19 +206,10 @@ docker-compose restart brain
 **Models loaded:**
 - Vorpal: Qwen 2.5-7B-Instruct-AWQ (~6GB VRAM)
 - Goblin: DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf (~5-6GB VRAM)
-- Embeddings: all-MiniLM-L6-v2 (~90MB)
+- Gateway: Bifrost Intelligent Router
 
-**VRAM usage:** ~14GB / 16GB (87% utilization)
+**VRAM usage:** ~14GB / 16GB
 **RAM usage:** ~4-6GB
-**Disk usage:** ~12GB (models + data)
-
-### Performance Expectations
-
-- **Chat response:** 2-4 seconds
-- **Code execution:** 1-3 seconds
-- **Memory search:** <1 second
-- **Voice STT:** 2-5 seconds
-- **Voice TTS:** 3-8 seconds
 
 ---
 
@@ -243,22 +220,11 @@ docker-compose restart brain
 ```bash
 # Manual download
 python3 scripts/download-models.py --model goblin-7b
-
-# Check disk space
-df -h .
 ```
 
 ### Out of VRAM
 
-If you have less than 16GB VRAM, use single-engine mode:
-
-```bash
-# Stop everything
-./shutdown.sh
-
-# Start in 3B mode (uses ~12GB VRAM)
-docker-compose up -d
-```
+If you have less than 16GB VRAM, use single-engine mode by editing `docker-compose.yml` or using a smaller Vorpal model.
 
 ### Service Won't Start
 
@@ -267,28 +233,7 @@ docker-compose up -d
 docker-compose logs brain
 
 # Check ports
-sudo netstat -tulpn | grep -E '8080|6379|8000'
-
-# Restart service
-docker-compose restart brain
-```
-
-### Can't Access Web UI
-
-```bash
-# Check if UI server is running
-lsof -i:8888
-
-# Manually start UI
-cd ui && python3 -m http.server 8888
-```
-
-### Import Errors or Code Issues
-
-```bash
-# Rebuild containers
-docker-compose build brain
-docker-compose up -d
+sudo netstat -tulpn | grep -E '8081|6379|8000|8080'
 ```
 
 ---
@@ -298,28 +243,8 @@ docker-compose up -d
 Now that you're up and running:
 
 1. **Explore the Web UI** - Try different agents and memory features
-2. **Read the API Docs** - http://localhost:8080/docs for all endpoints
+2. **Read the API Docs** - http://localhost:8081/docs for all endpoints
 3. **Configure Your System** - See [CONFIG.md](Docs/CONFIG.md) for advanced options
-4. **Add Voice** - Enable voice I/O in the UI
-5. **Run Tests** - `bash scripts/run-stress-test.sh` to verify performance
-6. **Read User Manual** - [USER_MANUAL.md](Docs/USER_MANUAL.md) for comprehensive guide
-
----
-
-## Production Deployment
-
-For production use, see:
-- [DEPLOYMENT.md](Docs/DEPLOYMENT.md) - Production deployment guide
-- [CONFIG.md](Docs/CONFIG.md) - Configuration options
-- [PERFORMANCE.md](Docs/PERFORMANCE.md) - Performance tuning
-
----
-
-## Getting Help
-
-- **Documentation:** See [Docs/](Docs/) directory
-- **Issues:** https://github.com/yourusername/archive-ai/issues
-- **Health Check:** `bash scripts/health-check.sh` for diagnostic info
 
 ---
 
@@ -327,24 +252,18 @@ For production use, see:
 
 ```bash
 # Start
-./go.sh
+./start
 
 # Stop
-./shutdown.sh
+Ctrl+C
 
 # Health check
 bash scripts/health-check.sh
 
-# View logs
-docker-compose logs -f
-
-# Restart service
-docker-compose restart <service>
-
 # Access points
 http://localhost:8888                      # Main UI
-http://localhost:8080/ui/metrics-panel.html # Metrics
-http://localhost:8080/docs                  # API docs
+http://localhost:8081/ui/metrics-panel.html # Metrics
+http://localhost:8081/docs                  # API docs
 ```
 
 ---

@@ -13,47 +13,44 @@ Once the backend is confirmed to be running (e.g., via `bash scripts/health-chec
 
 ---
 
-## 1. Web UI (Functional Chat Client)
+## 1. Web UI (Modern Chat Client)
 
-The primary web-based chat client provides a simple and functional interface to interact with the Archive-AI.
+The primary web-based chat client provides a clean, modern interface to interact with Archive-AI.
 
 ### Accessing the Web UI
 
-1.  **Ensure backend is running:** If you've just started with `./go.sh`, the web UI should be accessible automatically.
-2.  **Open in Browser:** Navigate to the following URL in your web browser:
-    `http://localhost:8080/ui/index.html`
+1.  **Start with the master script:** Run `./start --web` to launch the backend and serve the UI on port 8888.
+2.  **Open in Browser:** Navigate to:
+    `http://localhost:8888`
+    (Or directly via Brain at `http://localhost:8081/ui/index.html`)
 
 ### Features
 
-*   **Chat:** Send messages to the Archive-AI and receive responses.
+*   **Chat:** Send messages to Archive-AI and receive responses.
 *   **Mode Selection:** Switch between `Chat`, `Verified`, `Basic Agent`, and `Advanced Agent` modes.
-*   **Quick Actions:** Use pre-defined buttons to quickly ask for time or perform calculations.
-*   **API Connection:** The UI is pre-configured to communicate with the Brain API at `http://localhost:8080`.
+*   **Quick Actions:** Use pre-defined buttons for time or calculations.
+*   **API Connection:** Communicates with the Brain API at `http://localhost:8081`.
 
 ---
 
-## 2. Flutter UI (Basic Desktop Client)
+## 2. Flutter UI (Desktop Client)
 
-A basic Flutter desktop application is available as a proof-of-concept client. This client offers fundamental chat functionality with simulated responses and is not yet connected to the backend API.
+A Flutter desktop application is available for a native experience. Unlike the web UI, this client is a standalone desktop app.
 
 ### Running the Flutter UI
 
-1.  **Navigate to the Flutter project directory:**
+1.  **Launch via Master Script:** Run `./start --gui` from the project root. This will start the backend and launch the Flutter app automatically.
+2.  **Manual Start:**
     ```bash
     cd ui/flutter_ui
-    ```
-2.  **Ensure Flutter SDK is installed and configured.** If not, follow the official Flutter installation guide for your operating system.
-3.  **Run the application (Linux example):**
-    ```bash
     flutter run -d linux
     ```
-    *   Replace `linux` with `windows` or `macos` if you have configured Flutter for those desktop platforms.
-    *   The application will compile and launch in a new desktop window.
 
 ### Features
 
-*   **Basic Chat Interface:** Type messages and see them appear in the chat log.
-*   **Simulated Responses:** The client will provide a simulated reply to your messages. (Note: This version is NOT connected to the Archive-AI backend).
+*   **Native Desktop Experience:** Runs as a standalone application on Linux (can be compiled for Windows/macOS).
+*   **Live API Connection:** Connected to the Brain API at `http://localhost:8081`.
+*   **Basic Chat:** Core conversation functionality.
 
 This provides a basic visual representation of a desktop client for the system.
 
