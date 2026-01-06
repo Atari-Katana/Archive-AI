@@ -29,7 +29,8 @@ class CodeValidator:
     # Modules that are safe and commonly used
     SAFE_MODULES = {
         'math', 'random', 'datetime', 'json', 're',
-        'itertools', 'functools', 'collections', 'string'
+        'itertools', 'functools', 'collections', 'string',
+        'hashlib'
     }
 
     def validate(self, code: str) -> Tuple[bool, Optional[str]]:

@@ -88,6 +88,9 @@ async def execute_code(request: CodeRequest) -> CodeResponse:
                 "filter": filter,
                 "any": any,
                 "all": all,
+                "type": type,
+                "help": help,
+                "__import__": __import__,
             }
         }
 

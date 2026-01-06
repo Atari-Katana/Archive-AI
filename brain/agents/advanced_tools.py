@@ -91,6 +91,32 @@ async def code_execution(code: str) -> str:
         if not code or not code.strip():
             return "Error: Code cannot be empty"
 
+        # Aggressively strip surrounding quotes and whitespace
+        code = code.strip()
+        while (code.startswith("'") and code.endswith("'")) or (code.startswith('"') and code.endswith('"')):
+            code = code[1:-1].strip()
+        
+        # Handle escaped newlines (if LLM sends literal \n)
+        if "\\n" in code:
+            try:
+                # Use unicode_escape to convert literal \n to actual newline
+                # but be careful not to break other characters
+                code = bytes(code, "utf-8").decode("unicode_escape")
+            except Exception:
+                # Fallback to simple replace if decode fails
+                code = code.replace("\\n", "\n")
+        
+        # Remove markdown code blocks
+        if code.startswith("```"):
+            # Remove first line (e.g. ```python)
+            lines = code.split("\n")
+            if lines[0].startswith("```"):
+                lines = lines[1:]
+            # Remove last line if it's ```
+            if lines and lines[-1].strip() == "```":
+                lines = lines[:-1]
+            code = "\n".join(lines)
+        
         code = code.strip()
 
         # Validate code before execution
