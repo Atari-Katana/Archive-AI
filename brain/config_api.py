@@ -175,35 +175,33 @@ async def get_config():
     """
     Get current configuration.
 
-    Returns current values from .env file and environment.
+    Returns current values from environment variables (runtime source of truth).
     """
-    env_vars = read_env_file()
-
-    # Build config dict with defaults
+    # Build config dict from os.getenv to reflect actual runtime state
     config = {
         # Service URLs
-        "vorpal_url": env_vars.get("VORPAL_URL", "http://vorpal:8000"),
-        "goblin_url": env_vars.get("GOBLIN_URL", "http://goblin:8080"),
-        "sandbox_url": env_vars.get("SANDBOX_URL", "http://sandbox:8000"),
-        "voice_url": env_vars.get("VOICE_URL", "http://voice:8001"),
-        "redis_url": env_vars.get("REDIS_URL", "redis://redis:6379"),
+        "vorpal_url": os.getenv("VORPAL_URL", "http://vorpal:8000"),
+        "goblin_url": os.getenv("GOBLIN_URL", "http://goblin:8080"),
+        "sandbox_url": os.getenv("SANDBOX_URL", "http://sandbox:8000"),
+        "voice_url": os.getenv("VOICE_URL", "http://voice:8001"),
+        "redis_url": os.getenv("REDIS_URL", "redis://redis:6379"),
 
         # Feature flags
-        "async_memory": env_vars.get("ASYNC_MEMORY", "true").lower() == "true",
-        "enable_voice": env_vars.get("ENABLE_VOICE", "false").lower() == "true",
+        "async_memory": os.getenv("ASYNC_MEMORY", "true").lower() == "true",
+        "enable_voice": os.getenv("ENABLE_VOICE", "false").lower() == "true",
 
         # Model settings
-        "vorpal_model": env_vars.get("VORPAL_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
+        "vorpal_model": os.getenv("VORPAL_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
 
         # Archive settings
-        "archive_days_threshold": int(env_vars.get("ARCHIVE_DAYS_THRESHOLD", "30")),
-        "archive_keep_recent": int(env_vars.get("ARCHIVE_KEEP_RECENT", "1000")),
-        "archive_hour": int(env_vars.get("ARCHIVE_HOUR", "3")),
-        "archive_minute": int(env_vars.get("ARCHIVE_MINUTE", "0")),
-        "archive_enabled": env_vars.get("ARCHIVE_ENABLED", "true").lower() == "true",
+        "archive_days_threshold": int(os.getenv("ARCHIVE_DAYS_THRESHOLD", "30")),
+        "archive_keep_recent": int(os.getenv("ARCHIVE_KEEP_RECENT", "1000")),
+        "archive_hour": int(os.getenv("ARCHIVE_HOUR", "3")),
+        "archive_minute": int(os.getenv("ARCHIVE_MINUTE", "0")),
+        "archive_enabled": os.getenv("ARCHIVE_ENABLED", "true").lower() == "true",
 
         # Logging
-        "log_level": env_vars.get("LOG_LEVEL", "INFO"),
+        "log_level": os.getenv("LOG_LEVEL", "INFO"),
     }
 
     return ConfigResponse(config=config, restart_required=False)

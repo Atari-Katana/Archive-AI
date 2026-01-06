@@ -1,6 +1,27 @@
 const API_BASE = 'http://localhost:8081';
 let currentMode = 'chat';
 
+// Fetch and display system status
+async function updateSystemStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/config`);
+        if (response.ok) {
+            const data = await response.json();
+            const modelName = data.config.vorpal_model || 'Unknown';
+            const cleanName = modelName.split('/').pop(); // Show only the model part (e.g., Qwen2.5-7B-Instruct-AWQ)
+            document.getElementById('modelStatus').textContent = cleanName;
+        } else {
+            document.getElementById('modelStatus').textContent = 'Error';
+        }
+    } catch (error) {
+        console.error('Failed to fetch config:', error);
+        document.getElementById('modelStatus').textContent = 'Offline';
+    }
+}
+
+// Initial status check
+updateSystemStatus();
+
 // DOM elements
 const chatContainer = document.getElementById('chatContainer');
 const userInput = document.getElementById('userInput');
