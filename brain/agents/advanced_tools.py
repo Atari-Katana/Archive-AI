@@ -296,22 +296,107 @@ async def json_tool(json_input: str) -> str:
 
 async def web_search_tool(query: str) -> str:
     """
-    Placeholder for web search functionality.
-
-    Note: This is a placeholder. Actual web search would require
-    an external API (DuckDuckGo, SerpAPI, etc.) or access to a
-    search engine.
+    Search the web using DuckDuckGo with fallback to Wikipedia.
 
     Args:
         query: Search query
 
     Returns:
-        Placeholder message (to be implemented)
+        Formatted search results from best available source
     """
-    return (
-        f"Web search for '{query}' is not yet implemented.\n"
-        "This feature requires integration with a search API."
-    )
+    try:
+        from duckduckgo_search import DDGS
+        
+        # Validate input
+        if not query or not query.strip():
+            return "Error: Search query cannot be empty"
+            
+        # Strip surrounding quotes from LLM
+        query = query.strip()
+        while (query.startswith("'") and query.endswith("'")) or (query.startswith('"') and query.endswith('"')):
+            query = query[1:-1].strip()
+        
+        results = []
+        source = "DuckDuckGo"
+        
+        # Stage 1: Try DDG Text
+        try:
+            with DDGS() as ddgs:
+                search_gen = ddgs.text(query, max_results=5)
+                for r in search_gen:
+                    results.append(r)
+        except Exception:
+            pass # Fall through to next stage
+            
+        # Stage 2: Try DDG News (if text failed)
+        if not results:
+            try:
+                with DDGS() as ddgs:
+                    search_gen = ddgs.news(query, max_results=5)
+                    for r in search_gen:
+                        # Normalize keys to match text results
+                        results.append({
+                            'title': r.get('title'),
+                            'href': r.get('url'),
+                            'body': r.get('body')
+                        })
+                if results:
+                    source = "DuckDuckGo News"
+            except Exception:
+                pass
+                
+        # Stage 3: Try Wikipedia (if DDG failed)
+        if not results:
+            try:
+                import httpx
+                headers = {"User-Agent": "Archive-AI/1.0 (Cognitive Framework; Local-First)"}
+                wiki_url = f"https://en.wikipedia.org/w/api.php?action=opensearch&search={query}&limit=3&format=json"
+                
+                async with httpx.AsyncClient(headers=headers, timeout=5.0) as client:
+                    resp = await client.get(wiki_url)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        # Wikipedia opensearch format: [query, [titles], [descriptions], [links]]
+                        titles = data[1]
+                        bodies = data[2]
+                        links = data[3]
+                        
+                        for i in range(len(titles)):
+                            results.append({
+                                'title': titles[i],
+                                'href': links[i],
+                                'body': bodies[i]
+                            })
+                        if results:
+                            source = "Wikipedia"
+            except Exception:
+                pass
+                
+        if not results:
+            return f"No results found for '{query}' across multiple sources (DDG, News, Wikipedia)."
+            
+        # Format results
+        output = f"Web Search Results ({source}) for '{query}':\n\n"
+        for i, res in enumerate(results, 1):
+            title = res.get('title', 'No Title')
+            link = res.get('href', '#')
+            body = res.get('body', 'No description available.')
+            
+            output += f"{i}. {title}\n"
+            output += f"   Link: {link}\n"
+            output += f"   Snippet: {body}\n\n"
+            
+        return output.strip()
+        
+    except ImportError:
+        return "Error: duckduckgo-search library not installed."
+    except Exception as e:
+        return f"Error performing web search: {str(e)}"
+        
+    except ImportError:
+        return "Error: duckduckgo-search library not installed."
+    except Exception as e:
+        return f"Error performing web search: {str(e)}"
 
 
 # Tool registry for advanced tools
@@ -350,8 +435,10 @@ ADVANCED_TOOLS = {
         json_tool
     ),
     "WebSearch": (
-        "Search the web for current information (NOT YET IMPLEMENTED - this is a placeholder). "
-        "Input format: search query as plain text",
+        "Search the web for current information, news, or technical documentation. "
+        "Powered by DuckDuckGo (privacy-focused). "
+        "Input format: search query as plain text. "
+        "Example: 'latest python version' or 'who won the 2024 super bowl'",
         web_search_tool
     ),
 }
