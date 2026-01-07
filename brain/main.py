@@ -676,13 +676,12 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # Capture input to Redis Stream (non-blocking, fire and forget)
     await stream_handler.capture_input(request.message)
 
-    logger.info(f"Routing message to Bifrost")
-
+    # Handle CHAT intent (default)
     try:
-        # Proxy request to Bifrost (OpenAI-compatible API)
+        # Proxy request to Vorpal (vLLM OpenAI-compatible API)
         async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
-            bifrost_payload = {
-                "model": "bifrost",  # Bifrost will route this
+            vorpal_payload = {
+                "model": config.VORPAL_MODEL,
                 "messages": [
                     {"role": "user", "content": request.message}
                 ],
@@ -691,26 +690,24 @@ async def chat(request: ChatRequest) -> ChatResponse:
             }
 
             response = await client.post(
-                f"{config.BIFROST_URL}/v1/chat/completions",
-                json=bifrost_payload
+                f"{config.VORPAL_URL}/v1/chat/completions",
+                json=vorpal_payload
             )
             response.raise_for_status()
             result = response.json()
-
-            # Extract message content from chat completions response
-            completion_text = result.get("choices", [{}])[0].get(
-                "message", {}
-            ).get("content", "").strip()
+            
+            # Extract response text
+            completion_text = result['choices'][0]['message']['content']
 
             return ChatResponse(
                 response=completion_text,
-                engine="bifrost"
+                engine="vorpal"
             )
 
     except httpx.HTTPError as e:
         raise HTTPException(
             status_code=503,
-            detail=f"Bifrost gateway error: {str(e)}"
+            detail=f"Vorpal engine error: {str(e)}"
         )
 
 

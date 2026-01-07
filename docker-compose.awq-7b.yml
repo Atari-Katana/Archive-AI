@@ -6,12 +6,12 @@ version: '3.8'
 services:
   vorpal:
     environment:
-      - VORPAL_MODEL=${VORPAL_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+      - VORPAL_MODEL=${VORPAL_MODEL:-/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}
       - VORPAL_GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.45}  # Aim to keep Vorpal around ~6GB
       - VORPAL_MAX_MODEL_LEN=${VORPAL_MAX_MODEL_LEN:-4096}
       - VORPAL_MAX_NUM_SEQS=${VORPAL_MAX_NUM_SEQS:-64}
     command:
-      - "${VORPAL_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}"   # AWQ HF repo (download or pre-cache before start)
+      - "${VORPAL_MODEL:-/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}"   # Local AWQ model path
       - "--host"
       - "0.0.0.0"
       - "--port"
@@ -24,9 +24,17 @@ services:
       - "${VORPAL_MAX_NUM_SEQS:-64}"
 
   goblin:
+    image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
       - MODEL_PATH=${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf}
-      - N_GPU_LAYERS=${GOBLIN_N_GPU_LAYERS:-20}
+      - N_GPU_LAYERS=${GOBLIN_N_GPU_LAYERS:-38}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     command:
       - "--model"
       - "${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf}"
@@ -37,7 +45,7 @@ services:
       - "--ctx-size"
       - "${GOBLIN_CTX_SIZE:-8192}"
       - "--n-gpu-layers"
-      - "${GOBLIN_N_GPU_LAYERS:-20}"
+      - "${GOBLIN_N_GPU_LAYERS:-38}"
       - "--threads"
       - "${GOBLIN_THREADS:-8}"
       - "--batch-size"
@@ -51,4 +59,4 @@ services:
 
   brain:
     environment:
-      - VORPAL_MODEL=${VORPAL_MODEL:-Qwen/Qwen2.5-7B-Instruct-AWQ}
+      - VORPAL_MODEL=${VORPAL_MODEL:-/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}
