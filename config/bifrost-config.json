@@ -1,0 +1,46 @@
+{
+  "providers": {
+    "vorpal": {
+      "keys": [
+        {
+          "name": "vorpal-key",
+          "value": "dummy-key",
+          "models": ["/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4", "Qwen/Qwen2.5-7B-Instruct-AWQ", "Qwen/Qwen2.5-3B-Instruct"],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "base_url": "http://vorpal:8000",
+        "default_request_timeout_in_seconds": 60
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true
+        }
+      }
+    },
+    "goblin": {
+      "keys": [
+        {
+          "name": "goblin-key",
+          "value": "dummy-key",
+          "models": ["goblin", "DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf"],
+          "weight": 1.0
+        }
+      ],
+      "network_config": {
+        "base_url": "http://goblin:8080",
+        "default_request_timeout_in_seconds": 120
+      },
+      "custom_provider_config": {
+        "base_provider_type": "openai",
+        "allowed_requests": {
+          "chat_completion": true,
+          "chat_completion_stream": true
+        }
+      }
+    }
+  }
+}

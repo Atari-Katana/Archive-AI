@@ -228,6 +228,8 @@ services:
     container_name: archive-bifrost-cf
     ports:
       - "8080:8080"
+    volumes:
+      - ./config/bifrost-config.json:/app/data/config.json
     networks:
       - archive-net
     restart: unless-stopped

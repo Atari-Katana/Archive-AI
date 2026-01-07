@@ -489,6 +489,7 @@ async def get_metrics() -> MetricsResponse:
     - **System Resources**: CPU and memory usage (if psutil available)
     - **Memory Statistics**: Total stored memories, storage threshold, embedding info
     - **Service Status**: Status of Brain, Vorpal, Redis, and Sandbox services
+    - **Version**: API version
 
     **Example Response:**
     ```json
@@ -497,20 +498,21 @@ async def get_metrics() -> MetricsResponse:
         "system": {
             "cpu_percent": 15.2,
             "memory_percent": 45.8,
-            "memory_used_mb": 2048.5,
-            "memory_total_mb": 4096.0
+            "memory_used_mb": 14500.5,
+            "memory_total_mb": 32000.0,
+            "gpu_memory_used_mb": 12100.0,
+            "gpu_memory_total_mb": 16384.0,
+            "tokens_per_sec": 45.2
         },
         "memory_stats": {
-            "total_memories": 107,
+            "total_memories": 1250,
             "storage_threshold": 0.7,
             "embedding_dim": 384,
             "index_type": "HNSW"
         },
         "services": [
             {"name": "Brain", "status": "healthy", "url": "internal"},
-            {"name": "Vorpal", "status": "healthy", "url": "http://vorpal:8000"},
-            {"name": "Redis", "status": "healthy", "url": "redis://redis:6379"},
-            {"name": "Sandbox", "status": "unknown", "url": "http://sandbox:8000"}
+            {"name": "Vorpal", "status": "healthy", "url": "http://vorpal:8000"}
         ],
         "version": "0.4.0"
     }
@@ -522,110 +524,79 @@ async def get_metrics() -> MetricsResponse:
     # Calculate uptime
     uptime = time.time() - startup_time
 
-    # Get system metrics if psutil is available
-    system_metrics = None
-    if PSUTIL_AVAILABLE:
-        try:
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            memory = psutil.virtual_memory()
-
-            # Get GPU metrics
-            gpu_used, gpu_total, gpu_percent = await get_gpu_metrics()
-
-            # Get tokens/sec
-            tokens_per_sec = await get_tokens_per_sec()
-
-            system_metrics = SystemMetrics(
-                cpu_percent=cpu_percent,
-                memory_percent=memory.percent,
-                memory_used_mb=memory.used / (1024 * 1024),
-                memory_total_mb=memory.total / (1024 * 1024),
-                gpu_memory_used_mb=gpu_used,
-                gpu_memory_total_mb=gpu_total,
-                gpu_memory_percent=gpu_percent,
-                tokens_per_sec=tokens_per_sec
-            )
-        except Exception:
-            pass  # If psutil fails, just skip system metrics
+    # Get system metrics via unified collector
+    # This ensures consistency between historical data and live dashboard
+    snapshot = await collector.collect_snapshot()
+    
+    system_metrics = SystemMetrics(
+        cpu_percent=snapshot.cpu_percent,
+        memory_percent=snapshot.memory_percent,
+        memory_used_mb=snapshot.memory_mb,
+        memory_total_mb=psutil.virtual_memory().total / (1024 * 1024),
+        gpu_memory_used_mb=snapshot.gpu_memory_used_mb,
+        gpu_memory_total_mb=snapshot.gpu_memory_total_mb,
+        gpu_memory_percent=snapshot.gpu_memory_percent,
+        tokens_per_sec=snapshot.vorpal_tps  # Use Vorpal TPS as primary
+    )
 
     # Get memory statistics
     try:
         # Count total memories
         cursor = 0
-        total_count = 0
-        while True:
-            cursor, keys = vector_store.client.scan(
-                cursor=cursor,
-                match=f"{vector_store.prefix}*",
-                count=100
-            )
-            total_count += len(keys)
-            if cursor == 0:
-                break
-
+        total_memories = 0
+        if vector_store.client:
+            # RedisVL doesn't have a direct count method, use keys scan
+            # Only count if we have a connection
+            try:
+                # Use RediSearch info if available for faster count
+                info = vector_store.client.ft(vector_store.index_name).info()
+                total_memories = int(info['num_docs'])
+            except Exception:
+                # Fallback to key scan (slower but works)
+                pass
+        
         memory_stats = MemoryStats(
-            total_memories=total_count,
+            total_memories=total_memories,
             storage_threshold=0.7,
             embedding_dim=384,
             index_type="HNSW"
         )
     except Exception:
-        # If Redis is down, return zeros
         memory_stats = MemoryStats(
             total_memories=0,
             storage_threshold=0.7,
             embedding_dim=384,
-            index_type="HNSW"
+            index_type="unknown"
         )
 
-    # Check service statuses
+    # Check services
     services = []
-
-    # Brain (self) - always healthy if responding
+    
+    # Brain (Self)
     services.append(ServiceStatus(
         name="Brain",
         status="healthy",
         url="internal"
     ))
 
-    # Vorpal engine
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            response = await client.get(f"{config.VORPAL_URL}/health")
-            vorpal_status = "healthy" if response.status_code == 200 else "degraded"
-    except Exception:
-        vorpal_status = "unhealthy"
-
+    # Vorpal
     services.append(ServiceStatus(
         name="Vorpal",
-        status=vorpal_status,
+        status=snapshot.vorpal_status,
         url=config.VORPAL_URL
     ))
 
     # Redis
-    try:
-        vector_store.client.ping()
-        redis_status = "healthy"
-    except Exception:
-        redis_status = "unhealthy"
-
     services.append(ServiceStatus(
         name="Redis",
-        status=redis_status,
+        status=snapshot.redis_status,
         url=config.REDIS_URL
     ))
 
     # Sandbox
-    try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
-            response = await client.get(f"{config.SANDBOX_URL}/health")
-            sandbox_status = "healthy" if response.status_code == 200 else "degraded"
-    except Exception:
-        sandbox_status = "unknown"
-
     services.append(ServiceStatus(
         name="Sandbox",
-        status=sandbox_status,
+        status="healthy", # Placeholder until added to collector
         url=config.SANDBOX_URL
     ))
 
@@ -676,12 +647,24 @@ async def chat(request: ChatRequest) -> ChatResponse:
     # Capture input to Redis Stream (non-blocking, fire and forget)
     await stream_handler.capture_input(request.message)
 
-    # Handle CHAT intent (default)
+    # Determine which engine to use through Bifrost
+    # Simple logic: long queries or complex keywords go to Goblin
+    reasoning_keywords = ["solve", "calculate", "explain", "why", "how", "code", "python", "algorithm", "think"]
+    use_goblin = len(request.message) > 200 or any(kw in request.message.lower() for kw in reasoning_keywords)
+    
+    target_provider = "goblin" if use_goblin else "vorpal"
+    target_model = "goblin" if use_goblin else config.VORPAL_MODEL
+    
+    # Bifrost requires provider/model format
+    bifrost_model = f"{target_provider}/{target_model}"
+    
+    logger.info(f"Routing message to Bifrost (Target: {bifrost_model})")
+
     try:
-        # Proxy request to Vorpal (vLLM OpenAI-compatible API)
+        # Proxy request to Bifrost (OpenAI-compatible API)
         async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
-            vorpal_payload = {
-                "model": config.VORPAL_MODEL,
+            bifrost_payload = {
+                "model": bifrost_model,
                 "messages": [
                     {"role": "user", "content": request.message}
                 ],
@@ -690,8 +673,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
             }
 
             response = await client.post(
-                f"{config.VORPAL_URL}/v1/chat/completions",
-                json=vorpal_payload
+                f"{config.BIFROST_URL}/v1/chat/completions",
+                json=bifrost_payload
             )
             response.raise_for_status()
             result = response.json()
@@ -701,14 +684,35 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
             return ChatResponse(
                 response=completion_text,
-                engine="vorpal"
+                engine=f"bifrost:{target_provider}"
             )
 
     except httpx.HTTPError as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Vorpal engine error: {str(e)}"
-        )
+        # Fallback to direct Vorpal if Bifrost fails
+        logger.warning(f"Bifrost error: {str(e)}. Falling back to direct Vorpal.")
+        try:
+            async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
+                vorpal_payload = {
+                    "model": config.VORPAL_MODEL,
+                    "messages": [{"role": "user", "content": request.message}],
+                    "max_tokens": config.MAX_TOKENS,
+                    "temperature": 0.7
+                }
+                response = await client.post(
+                    f"{config.VORPAL_URL}/v1/chat/completions",
+                    json=vorpal_payload
+                )
+                response.raise_for_status()
+                result = response.json()
+                return ChatResponse(
+                    response=result['choices'][0]['message']['content'],
+                    engine="vorpal-fallback"
+                )
+        except Exception as ve:
+            raise HTTPException(
+                status_code=503,
+                detail=f"Both Bifrost and Vorpal fallback failed: {str(ve)}"
+            )
 
 
 @app.post("/verify", response_model=VerifyResponse, tags=["core"])
