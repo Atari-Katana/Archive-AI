@@ -4,20 +4,53 @@ let currentMode = 'chat';
 // Fetch and display system status
 async function updateSystemStatus() {
     try {
-        const response = await fetch(`${API_BASE}/config`);
-        if (response.ok) {
-            const data = await response.json();
+        // Fetch config for model name
+        const configResp = await fetch(`${API_BASE}/config`);
+        if (configResp.ok) {
+            const data = await configResp.json();
             const modelName = data.config.vorpal_model || 'Unknown';
-            const cleanName = modelName.split('/').pop(); // Show only the model part (e.g., Qwen2.5-7B-Instruct-AWQ)
+            const cleanName = modelName.split('/').pop();
             document.getElementById('modelStatus').textContent = cleanName;
-        } else {
-            document.getElementById('modelStatus').textContent = 'Error';
         }
+
+        // Fetch metrics for VRAM/RAM/Speed
+        const metricsResp = await fetch(`${API_BASE}/metrics`);
+        if (metricsResp.ok) {
+            const metrics = await metricsResp.json();
+            
+            // System Memory (RAM)
+            if (metrics.system) {
+                const ramUsed = (metrics.system.memory_used_gb || 0).toFixed(1);
+                const ramTotal = (metrics.system.memory_total_gb || 0).toFixed(1);
+                document.getElementById('ramStatus').textContent = `${ramUsed} / ${ramTotal} GB`;
+            }
+
+            // GPU Memory (VRAM) - Assuming single GPU for now
+            if (metrics.gpu && metrics.gpu.length > 0) {
+                const gpu = metrics.gpu[0];
+                const vramUsed = (gpu.memory_used_gb || 0).toFixed(1);
+                const vramTotal = (gpu.memory_total_gb || 0).toFixed(1);
+                document.getElementById('vramStatus').textContent = `${vramUsed} / ${vramTotal} GB`;
+            }
+
+            // Token Speeds (Placeholder logic - needs backend support for real-time t/s)
+            // Ideally, the backend metrics should provide 'vorpal_tps' and 'goblin_tps'
+            // For now, we'll display "Idle" or the last known speed if available
+            const vorpalSpeed = metrics.vorpal_tps ? metrics.vorpal_tps.toFixed(1) : '--';
+            const goblinSpeed = metrics.goblin_tps ? metrics.goblin_tps.toFixed(1) : '--';
+            
+            document.getElementById('vorpalSpeed').textContent = `${vorpalSpeed} t/s`;
+            document.getElementById('goblinSpeed').textContent = `${goblinSpeed} t/s`;
+        }
+
     } catch (error) {
-        console.error('Failed to fetch config:', error);
+        console.error('Failed to fetch status:', error);
         document.getElementById('modelStatus').textContent = 'Offline';
     }
 }
+
+// Update status every 5 seconds
+setInterval(updateSystemStatus, 5000);
 
 // Initial status check
 updateSystemStatus();
