@@ -302,7 +302,7 @@ Monitors `~/ArchiveAI/Library-Drop` for documents and ingests them into the vect
 REDIS_PASSWORD=<generated>  # Use: openssl rand -base64 32
 
 # === Service Ports ===
-BRAIN_PORT=8080
+BRAIN_PORT=8081
 
 # === Memory Archival ===
 ARCHIVE_DAYS=30          # Archive memories older than N days
@@ -751,7 +751,7 @@ archive-ai/
 
 4. **Test**:
    ```bash
-   curl -X POST http://localhost:8080/chat \
+   curl -X POST http://localhost:8081/chat \
      -H "Content-Type: application/json" \
      -d '{"message": "test"}'
    ```
@@ -774,12 +774,12 @@ docker-compose restart brain
 
 3. Test:
 ```bash
-curl http://localhost:8080/custom
+curl http://localhost:8081/custom
 ```
 
 4. Check API docs:
 ```
-http://localhost:8080/docs
+http://localhost:8081/docs
 ```
 
 ---
@@ -884,7 +884,7 @@ docker-compose logs vorpal | grep -i "loading"
 
 ```bash
 # Overall health
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 
 # Vorpal
 curl http://localhost:8000/health
@@ -1043,7 +1043,7 @@ docker-compose up -d vorpal
 
 **Prometheus Metrics**: Available at `http://localhost:8000/metrics` (Vorpal)
 
-**System Metrics**: Available at `http://localhost:8080/metrics` (Brain)
+**System Metrics**: Available at `http://localhost:8081/metrics` (Brain)
 
 ---
 

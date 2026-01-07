@@ -133,10 +133,10 @@ See [CONFIG.md](Docs/CONFIG.md) for detailed configuration guide.
 
 | Service | Purpose | Tech Stack | Port |
 |---------|---------|------------|------|
-| **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8080 |
+| **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8081 |
 | **Bifrost** | Semantic Router | `maximhq/bifrost` | (Internal) |
 | **Vorpal** | Speed Engine (LLM) | vLLM + Qwen 7B AWQ / 3B | 8000 |
-| **Goblin** | Reasoning Engine | llama.cpp + DeepSeek 7B | 8081 |
+| **Goblin** | Reasoning Engine | llama.cpp + DeepSeek 7B | 8082 |
 | **Redis** | State + Vector DB | Redis Stack + RediSearch | 6379 |
 | **Voice** | Speech I/O | Faster-Whisper + F5-TTS | 8001 |
 | **Sandbox** | Code Execution | Isolated Python | 8003 |
@@ -202,7 +202,7 @@ User Input → Brain → Bifrost Gateway → Vorpal/Goblin (LLM) → Surprise Sc
 - `GET /admin/archive_stats` - Archive statistics
 - `POST /admin/search_archive` - Search archived memories
 
-**Full API Docs:** http://localhost:8080/docs (Swagger UI)
+**Full API Docs:** http://localhost:8081/docs (Swagger UI)
 
 ---
 
@@ -271,7 +271,7 @@ python3 scripts/download-models.py --model goblin-7b
 REDIS_PASSWORD=<generate with: openssl rand -base64 32>
 
 # Ports
-BRAIN_PORT=8080
+BRAIN_PORT=8081
 
 # Memory Archival
 ARCHIVE_DAYS=30          # Archive after 30 days
@@ -309,7 +309,7 @@ See [CONFIG.md](Docs/CONFIG.md) for all available options.
 
 ### Basic Chat
 ```bash
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What is quantum computing?"}'
 ```
@@ -317,22 +317,22 @@ curl -X POST http://localhost:8080/chat \
 ### Check Metrics ✨ NEW
 ```bash
 # Current snapshot
-curl http://localhost:8080/metrics/current | jq
+curl http://localhost:8081/metrics/current | jq
 
 # Last 24 hours
-curl 'http://localhost:8080/metrics/?hours=24' | jq '.summary'
+curl 'http://localhost:8081/metrics/?hours=24' | jq '.summary'
 ```
 
 ### Update Configuration ✨ NEW
 ```bash
-curl -X POST http://localhost:8080/config/ \
+curl -X POST http://localhost:8081/config/ \
   -H "Content-Type: application/json" \
   -d '{"vorpal_url": "http://vorpal:8000", "archive_days_threshold": 60}'
 ```
 
 ### Advanced Agent with Code Execution
 ```bash
-curl -X POST http://localhost:8080/agent/advanced \
+curl -X POST http://localhost:8081/agent/advanced \
   -H "Content-Type: application/json" \
   -d '{
     "question": "Calculate factorial of 15 using code execution",
@@ -454,7 +454,7 @@ See [PERFORMANCE.md](Docs/PERFORMANCE.md) and [FINAL_TEST_REPORT.md](FINAL_TEST_
 
 1. **Network Security**
    - Internal services bound to localhost only
-   - Only Brain (port 8080) externally accessible
+   - Only Brain (port 8081) externally accessible
    - Use nginx reverse proxy with SSL
 
 2. **Firewall Configuration**
@@ -537,7 +537,7 @@ tar -xzf ~/backups/archive-ai/archive-YYYYMMDD_HHMMSS.tar.gz
 docker-compose logs brain
 
 # Verify ports
-sudo netstat -tulpn | grep -E '8080|6379|8000'
+sudo netstat -tulpn | grep -E .8081|6379|8000'
 
 # Check GPU
 nvidia-smi
@@ -559,10 +559,10 @@ nvidia-smi
 docker exec archive-redis redis-cli INFO memory
 
 # Trigger manual archival
-curl -X POST http://localhost:8080/admin/archive_old_memories
+curl -X POST http://localhost:8081/admin/archive_old_memories
 
 # Check metrics
-curl http://localhost:8080/metrics/current | jq
+curl http://localhost:8081/metrics/current | jq
 ```
 
 ---

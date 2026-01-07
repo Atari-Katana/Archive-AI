@@ -5,7 +5,7 @@ Collects and stores historical performance metrics for monitoring.
 
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 import asyncio
 import time
@@ -27,12 +27,17 @@ class MetricsSnapshot(BaseModel):
     cpu_percent: float
     memory_mb: float
     memory_percent: float
+    gpu_memory_used_mb: Optional[float] = None
+    gpu_memory_total_mb: Optional[float] = None
+    gpu_memory_percent: Optional[float] = None
     request_count: int = 0
     avg_latency: float = 0.0
     error_rate: float = 0.0
     vorpal_status: str = "unknown"
     goblin_status: str = "unknown"
     redis_status: str = "unknown"
+    vorpal_tps: Optional[float] = None
+    goblin_tps: Optional[float] = None
 
 
 class MetricsResponse(BaseModel):
@@ -48,14 +53,6 @@ router = APIRouter(prefix="/metrics", tags=["Metrics"])
 class MetricsCollector:
     """
     Collects performance metrics and stores in Redis.
-
-    Metrics collected:
-    - CPU usage
-    - Memory usage
-    - Request counts
-    - Latency
-    - Error rates
-    - Service health status
     """
 
     def __init__(self):
@@ -69,6 +66,10 @@ class MetricsCollector:
         self.request_count = 0
         self.total_latency = 0.0
         self.error_count = 0
+        
+        # Engine stats state
+        self.last_vorpal_tokens = 0.0
+        self.last_vorpal_time = time.time()
 
     async def collect_snapshot(self) -> MetricsSnapshot:
         """Collect a single metrics snapshot"""
@@ -79,13 +80,30 @@ class MetricsCollector:
         mem_mb = mem_info.rss / 1024 / 1024
         mem_percent = self.process.memory_percent()
 
+        # Engine metrics
+        vorpal_url = config.VORPAL_URL if config else "http://localhost:8000"
+        goblin_url = config.GOBLIN_URL if config else "http://localhost:8080"
+        
+        vorpal_metrics = await self._get_engine_metrics(vorpal_url, "vllm")
+        # Goblin (llama.cpp) metrics logic can be added here if needed
+        goblin_metrics = {"healthy": False, "tps": 0.0} 
+
+        # Aggregate GPU stats (simple sum/avg for now)
+        gpu_used = vorpal_metrics.get("gpu_used_mb")
+        gpu_total = vorpal_metrics.get("gpu_total_mb")
+        
+        gpu_percent = None
+        if gpu_used and gpu_total and gpu_total > 0:
+            gpu_percent = (gpu_used / gpu_total) * 100
+
         # Calculate rates
         avg_latency = (self.total_latency / self.request_count) if self.request_count > 0 else 0.0
         error_rate = (self.error_count / self.request_count * 100) if self.request_count > 0 else 0.0
 
         # Service health checks
-        vorpal_status = await self._check_service(config.VORPAL_URL if config else "http://localhost:8000")
-        goblin_status = await self._check_service(config.GOBLIN_URL if config else "http://localhost:8080")
+        vorpal_status = "healthy" if vorpal_metrics.get("healthy") else "unhealthy"
+        # Simple health check for Goblin if we aren't parsing metrics yet
+        goblin_status = await self._check_service(goblin_url)
         redis_status = "healthy" if self._check_redis() else "unhealthy"
 
         return MetricsSnapshot(
@@ -93,13 +111,80 @@ class MetricsCollector:
             cpu_percent=cpu,
             memory_mb=mem_mb,
             memory_percent=mem_percent,
+            gpu_memory_used_mb=gpu_used,
+            gpu_memory_total_mb=gpu_total,
+            gpu_memory_percent=gpu_percent,
             request_count=self.request_count,
             avg_latency=avg_latency,
             error_rate=error_rate,
             vorpal_status=vorpal_status,
             goblin_status=goblin_status,
-            redis_status=redis_status
+            redis_status=redis_status,
+            vorpal_tps=vorpal_metrics.get("tps"),
+            goblin_tps=goblin_metrics.get("tps")
         )
+
+    async def _get_engine_metrics(self, url: str, engine_type: str) -> Dict[str, Any]:
+        """Fetch metrics from engine"""
+        result = {"healthy": False, "tps": 0.0, "gpu_used_mb": None, "gpu_total_mb": None}
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                # check health
+                try:
+                    health = await client.get(f"{url}/health")
+                    if health.status_code == 200:
+                        result["healthy"] = True
+                except:
+                    pass
+                
+                # Fetch metrics
+                try:
+                    metrics_resp = await client.get(f"{url}/metrics")
+                    if metrics_resp.status_code == 200:
+                        data = metrics_resp.text
+                        
+                        if engine_type == "vllm":
+                            current_tokens = 0.0
+                            found_tokens = False
+                            
+                            for line in data.split('\n'):
+                                if line.startswith('vllm:kv_cache_usage_perc'):
+                                    try:
+                                        percent = float(line.split()[-1])
+                                        # Estimate VRAM (Assume 16GB total)
+                                        result["gpu_total_mb"] = 16384.0
+                                        # Base usage (model weights ~6GB) + Cache usage (active ctx)
+                                        # This is a rough heuristic for the meter
+                                        result["gpu_used_mb"] = 6144.0 + (10240.0 * percent)
+                                    except:
+                                        pass
+                                elif line.startswith('vllm:generation_tokens_total'):
+                                    try:
+                                        current_tokens = float(line.split()[-1])
+                                        found_tokens = True
+                                    except:
+                                        pass
+                            
+                            # Calculate TPS delta
+                            if found_tokens:
+                                now = time.time()
+                                time_diff = now - self.last_vorpal_time
+                                token_diff = current_tokens - self.last_vorpal_tokens
+                                
+                                if time_diff > 0 and token_diff >= 0:
+                                    # If tokens haven't changed, decay the speed to 0 slowly or just show 0
+                                    # Real-time monitoring usually wants instantaneous speed
+                                    result["tps"] = token_diff / time_diff
+                                
+                                # Update state
+                                self.last_vorpal_tokens = current_tokens
+                                self.last_vorpal_time = now
+
+                except:
+                    pass
+        except:
+            pass
+        return result
 
     async def _check_service(self, url: str) -> str:
         """Check if service is healthy"""

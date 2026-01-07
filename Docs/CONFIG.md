@@ -31,7 +31,7 @@ Archive-AI supports **two deployment modes** with **two configuration layers**:
 ### Layer 1: Core Settings (.env) - Required
 Contains secrets and critical configuration:
 - `REDIS_PASSWORD` - Database authentication
-- `BRAIN_PORT` - API endpoint port (default: 8080)
+- `BRAIN_PORT` - API endpoint port (default: 8081)
 - `ARCHIVE_DAYS` - Memory archival threshold
 - See `.env.example` for all available options
 

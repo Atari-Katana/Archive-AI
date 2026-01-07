@@ -98,7 +98,7 @@ curl http://localhost:8000/v1/completions \
 ```bash
 # Place test GGUF in ./models/goblin/
 docker-compose up -d goblin
-curl http://localhost:8080/completion \
+curl http://localhost:8081/completion \
   -H "Content-Type: application/json" \
   -d '{"prompt": "Test", "n_predict": 10}'
 ```
@@ -151,7 +151,7 @@ python scripts/vram-stress-test.py --duration 600
 **Test:**
 ```bash
 docker-compose up -d brain
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello"}'
 ```
@@ -177,7 +177,7 @@ curl -X POST http://localhost:8080/chat \
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/chat -d '{"message": "Test"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Test"}'
 redis-cli XREAD COUNT 1 STREAMS session:input_stream 0
 ```
 
@@ -202,8 +202,8 @@ redis-cli XREAD COUNT 1 STREAMS session:input_stream 0
 **Test:**
 ```bash
 # Send messages, watch logs for perplexity scores
-curl -X POST http://localhost:8080/chat -d '{"message": "The sky is blue"}'
-curl -X POST http://localhost:8080/chat -d '{"message": "Flibbertigibbet zamboni"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "The sky is blue"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Flibbertigibbet zamboni"}'
 # Check logs for different perplexity values
 ```
 
@@ -259,12 +259,12 @@ results = search_similar("What food do I like?")
 **Test:**
 ```bash
 # Send repeated messages, check if second is ignored
-curl -X POST http://localhost:8080/chat -d '{"message": "I like coffee"}'
-curl -X POST http://localhost:8080/chat -d '{"message": "I like coffee"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "I like coffee"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "I like coffee"}'
 # Second should have low surprise score, not stored
 
 # Send novel message
-curl -X POST http://localhost:8080/chat -d '{"message": "I hate sardines"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "I hate sardines"}'
 # Should have high surprise score, stored
 ```
 
@@ -289,13 +289,13 @@ curl -X POST http://localhost:8080/chat -d '{"message": "I hate sardines"}'
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/chat -d '{"message": "Hello how are you"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Hello how are you"}'
 # Logs: route=chat
 
-curl -X POST http://localhost:8080/chat -d '{"message": "What did I say about pizza?"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "What did I say about pizza?"}'
 # Logs: route=memory_query
 
-curl -X POST http://localhost:8080/chat -d '{"message": "Run this code: print(hello)"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Run this code: print(hello)"}'
 # Logs: route=code_execution
 ```
 
@@ -375,7 +375,7 @@ curl -X POST http://localhost:8001/synthesize \
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/voice_chat \
+curl -X POST http://localhost:8081/voice_chat \
   -F "audio=@question.wav" \
   --output response.wav
 # Play response, verify it answers the question
@@ -513,10 +513,10 @@ result = search_library("Victorian railways")
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/chat -d '{"message": "Hello"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Hello"}'
 # Should route through LangGraph to chat node
 
-curl -X POST http://localhost:8080/chat -d '{"message": "What did I say earlier?"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "What did I say earlier?"}'
 # Should route to memory query node
 ```
 
@@ -541,7 +541,7 @@ curl -X POST http://localhost:8080/chat -d '{"message": "What did I say earlier?
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -d '{"message": "Run this: print(2+2)"}'
 # Should execute code and return "4"
 ```
@@ -567,7 +567,7 @@ curl -X POST http://localhost:8080/chat \
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -d '{"message": "Calculate fibonacci(10) and tell me the result"}'
 # Should: write code, execute it, observe result, respond
 ```
@@ -619,7 +619,7 @@ claims = extract_claims(draft)
 **Test:**
 ```bash
 # With library containing correct info
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -d '{"message": "Tell me about the Eiffel Tower", "use_cov": true}'
 # Should catch wrong height/date and correct them
 ```
@@ -693,12 +693,12 @@ python scripts/tune-gpu-layers.py --test-layers 30,35,38,40
 - Create simple Flask/FastAPI UI server
 - Basic HTML dashboard
 - No real-time data yet (static placeholders)
-- Serve on port 8080
+- Serve on port 8081
 
 **Test:**
 ```bash
 python ui/app.py
-# Open http://localhost:8080 in browser
+# Open http://localhost:8081 in browser
 # Should see dashboard layout
 ```
 

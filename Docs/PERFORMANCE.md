@@ -291,25 +291,25 @@ watch -n 60 'du -sh data/*'
 
 ```bash
 # All services status
-curl http://localhost:8080/metrics | jq '.services'
+curl http://localhost:8081/metrics | jq '.services'
 
 # Individual health
-curl http://localhost:8080/health
+curl http://localhost:8081/health
 curl http://localhost:8000/health  # Vorpal
 curl http://localhost:8001/health  # Voice
 
 # Archive stats
-curl http://localhost:8080/admin/archive_stats | jq
+curl http://localhost:8081/admin/archive_stats | jq
 ```
 
 ### Performance Testing
 
 ```bash
 # API latency test
-time curl -s http://localhost:8080/health
+time curl -s http://localhost:8081/health
 
 # Memory count
-curl http://localhost:8080/metrics | jq '.memory_stats.total_memories'
+curl http://localhost:8081/metrics | jq '.memory_stats.total_memories'
 
 # Redis memory
 docker exec archive-ai_redis_1 redis-cli INFO memory | grep used_memory_human

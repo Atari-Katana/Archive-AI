@@ -392,11 +392,25 @@ async def web_search_tool(query: str) -> str:
         return "Error: duckduckgo-search library not installed."
     except Exception as e:
         return f"Error performing web search: {str(e)}"
-        
-    except ImportError:
-        return "Error: duckduckgo-search library not installed."
+
+
+async def rlm_read_tool(corpus: str) -> str:
+    """
+    Specialized tool for processing large documents using the Recursive Language Model (RLM) pattern.
+    It decomposes the text and analyzes it iteratively.
+    """
+    from .recursive_agent import RecursiveAgent
+    try:
+        # We give it a generic 'summarize and analyze' instruction
+        # since tools typically take one input string.
+        async with RecursiveAgent(corpus=corpus) as agent:
+            result = await agent.solve(
+                "Perform a comprehensive analysis of this corpus. "
+                "Identify key themes, significant facts, and provide a detailed summary."
+            )
+            return result.answer
     except Exception as e:
-        return f"Error performing web search: {str(e)}"
+        return f"Error in RLM_Read: {str(e)}"
 
 
 # Tool registry for advanced tools
@@ -440,6 +454,13 @@ ADVANCED_TOOLS = {
         "Input format: search query as plain text. "
         "Example: 'latest python version' or 'who won the 2024 super bowl'",
         web_search_tool
+    ),
+    "RLM_Read": (
+        "Recursively read and analyze a large text document or corpus. "
+        "Use this for infinite-context tasks like summarizing books, searching huge logs, "
+        "or deep-reading complex papers. "
+        "Input format: The entire text content to be analyzed.",
+        rlm_read_tool
     ),
 }
 

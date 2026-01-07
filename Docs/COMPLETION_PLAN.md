@@ -582,9 +582,9 @@ All completed features have been integrated into the main Archive-Brain applicat
 
 ### UI Access Points
 
-- http://localhost:8080/metrics-panel.html - Performance dashboard
-- http://localhost:8080/config-panel.html - Configuration editor
-- http://localhost:8080/index.html - Main UI (existing)
+- http://localhost:8081/metrics-panel.html - Performance dashboard
+- http://localhost:8081/config-panel.html - Configuration editor
+- http://localhost:8081/index.html - Main UI (existing)
 
 ### Git Commit
 

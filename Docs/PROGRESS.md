@@ -300,7 +300,7 @@
 | Redis Stack | 6379, 8002 | ✅ Ready | State engine, vector store |
 | Sandbox | 8000 | ✅ Ready | Isolated code execution |
 | Vorpal | 8000 | ⏳ GPU | Speed engine (vLLM, 3.5GB VRAM) |
-| Goblin | 8081 | ⏳ GPU | Capacity engine (llama.cpp, 10GB VRAM) |
+| Goblin | 8082 | ⏳ GPU | Capacity engine (llama.cpp, 10GB VRAM) |
 | Brain | 8080 | ⏳ GPU | Orchestrator (needs Vorpal) |
 | Voice | 8001 | ✅ Ready | STT + TTS (needs voice model) |
 
@@ -712,7 +712,7 @@ cd ui && python3 -m http.server 8888
 
 ### 3. Test Chat API
 ```bash
-curl -X POST http://localhost:8080/chat \
+curl -X POST http://localhost:8081/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "Hello, how are you?"}'
 ```
@@ -720,10 +720,10 @@ curl -X POST http://localhost:8080/chat \
 ### 4. Browse Memories
 ```bash
 # List all memories
-curl http://localhost:8080/memories?limit=10
+curl http://localhost:8081/memories?limit=10
 
 # Search memories
-curl -X POST http://localhost:8080/memories/search \
+curl -X POST http://localhost:8081/memories/search \
   -H "Content-Type: application/json" \
   -d '{"query": "calculator", "top_k": 5}'
 ```

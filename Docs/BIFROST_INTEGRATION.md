@@ -28,7 +28,7 @@ A typical service definition looks like this:
     restart: unless-stopped
 ```
 
-This configuration uses the official `maximhq/bifrost` Docker image and exposes port 8080, which is the default port for the Bifrost UI and API.
+This configuration uses the official `maximhq/bifrost` Docker image and exposes port 8081, which is the default port for the Bifrost UI and API.
 
 ## Configuration
 
@@ -42,7 +42,7 @@ The communication between the `brain` service and the `bifrost` service is confi
 
 - **`.env` file**: You can override the default `BIFROST_URL` in the `.env` file. For example, if you are running the `brain` application outside of Docker and want to connect to a Bifrost instance running on your host machine, you would set the following in your `.env` file:
   ```
-  BIFROST_URL=http://localhost:8080
+  BIFROST_URL=http://localhost:8081
   ```
 
 ## Managing the Bifrost Service

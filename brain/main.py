@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Optional
 try:
     import psutil
@@ -999,6 +999,72 @@ async def agent_solve_advanced(request: AgentRequest) -> AgentResponse:
             status_code=500,
             detail=f"Agent error: {str(e)}"
         )
+
+
+from agents.recursive_agent import RecursiveAgent
+
+class RecursiveAgentRequest(BaseModel):
+    """Request for Recursive Agent"""
+    question: str = Field(..., description="Question to answer about the corpus")
+    corpus: str = Field(..., description="The large text document to process")
+    max_steps: int = Field(10, description="Maximum reasoning steps")
+
+
+@app.post("/agent/recursive", response_model=AgentResponse, tags=["agents"])
+async def run_recursive_agent(request: RecursiveAgentRequest) -> AgentResponse:
+    """
+    Run the Recursive Language Model (RLM) Agent.
+
+    This agent is designed for **Infinite Context** tasks.
+    It treats the provided `corpus` as an external variable in a Python REPL
+    and writes code to inspect, filter, and summarize it recursively.
+
+    Use this for:
+    - Analyzing large documents (PDFs, logs)
+    - Finding specific needles in large haystacks
+    - Summarizing books or long articles
+
+    **Example Request:**
+    ```json
+    {
+        "question": "What is the main conclusion?",
+        "corpus": "Long text..."
+    }
+    ```
+    """
+    if not request.question.strip():
+        raise HTTPException(status_code=400, detail="Question cannot be empty")
+    if not request.corpus:
+        raise HTTPException(status_code=400, detail="Corpus cannot be empty")
+
+    try:
+        # Initialize RLM agent
+        async with RecursiveAgent(corpus=request.corpus) as agent:
+            # Execute
+            result = await agent.solve(request.question)
+
+        # Format steps
+        formatted_steps = []
+        for step in result.steps:
+            formatted_steps.append({
+                "step_number": step.step_number,
+                "thought": step.thought,
+                "action": step.action,
+                "action_input": step.action_input,
+                "observation": step.observation
+            })
+
+        return AgentResponse(
+            answer=result.answer,
+            steps=formatted_steps,
+            total_steps=result.total_steps,
+            success=result.success,
+            error=result.error
+        )
+
+    except Exception as e:
+        logger.error(f"Recursive Agent error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/memories", response_model=MemoryListResponse, tags=["memory"])

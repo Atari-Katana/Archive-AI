@@ -70,7 +70,7 @@ cp sample_doc.pdf ~/ArchiveAI/Library-Drop/
 # Wait for processing (check logs)
 
 # Search via API
-curl -X POST http://localhost:8080/library/search \
+curl -X POST http://localhost:8081/library/search \
   -H "Content-Type: application/json" \
   -d '{"query": "Victorian railways", "top_k": 5}'
 
@@ -150,7 +150,7 @@ curl -X POST http://localhost:8001/synthesize \
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/research \
+curl -X POST http://localhost:8081/research \
   -H "Content-Type: application/json" \
   -d '{"question": "What were the major innovations in railway technology during the Victorian era?"}'
 
@@ -192,7 +192,7 @@ curl -X POST http://localhost:8080/research \
 
 **Test:**
 ```bash
-curl -X POST http://localhost:8080/code_assist \
+curl -X POST http://localhost:8081/code_assist \
   -H "Content-Type: application/json" \
   -d '{"task": "Write a Python function to calculate fibonacci numbers recursively, then test it with n=10"}'
 
@@ -230,13 +230,13 @@ curl -X POST http://localhost:8080/code_assist \
 **Test:**
 ```bash
 # Manually trigger archival
-curl -X POST http://localhost:8080/admin/archive_old_memories
+curl -X POST http://localhost:8081/admin/archive_old_memories
 
 # Check archive files created
 ls data/archive/2025-12/
 
 # Search archived memories
-curl -X POST http://localhost:8080/memories/search \
+curl -X POST http://localhost:8081/memories/search \
   -H "Content-Type: application/json" \
   -d '{"query": "old conversation", "include_archive": true}'
 ```
@@ -270,14 +270,14 @@ curl -X POST http://localhost:8080/memories/search \
 **Test:**
 ```bash
 # Test routing through graph
-curl -X POST http://localhost:8080/chat -d '{"message": "Hello"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Hello"}'
 # Should route to chat node
 
-curl -X POST http://localhost:8080/chat -d '{"message": "Search my memories for pizza"}'
+curl -X POST http://localhost:8081/chat -d '{"message": "Search my memories for pizza"}'
 # Should route to memory search node
 
 # Visualize graph
-curl http://localhost:8080/graph/visualize > graph.html
+curl http://localhost:8081/graph/visualize > graph.html
 # Open in browser, should see workflow diagram
 ```
 

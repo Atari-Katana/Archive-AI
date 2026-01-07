@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """
-Code Sandbox Server (Chunk 1.2)
-FastAPI server for safe Python code execution.
+Code Sandbox Server (Chunk 1.2) - Upgraded for RLM
+FastAPI server for safe Python code execution with LLM callback capability.
 """
 
 import io
+import os
 import contextlib
+import httpx
 from typing import Dict, Any
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 
-app = FastAPI(title="Archive-AI Code Sandbox", version="1.0.0")
+app = FastAPI(title="Archive-AI Code Sandbox", version="1.1.0")
 
 
 class CodeRequest(BaseModel):
     """Request model for code execution"""
     code: str
+    context: Dict[str, Any] = {}  # Variables to inject (e.g. CORPUS)
     timeout: int = 30  # seconds
 
 
@@ -36,20 +39,15 @@ async def root() -> Dict[str, str]:
 
 @app.get("/health")
 async def health() -> Dict[str, str]:
-    """Health check endpoint (standard convention)"""
+    """Health check endpoint"""
     return {"status": "healthy", "service": "code-sandbox"}
 
 
 @app.post("/execute", response_model=CodeResponse)
 async def execute_code(request: CodeRequest) -> CodeResponse:
     """
-    Execute Python code in isolated environment.
-
-    Args:
-        request: CodeRequest with code to execute
-
-    Returns:
-        CodeResponse with result or error
+    Execute Python code in isolated environment with context injection
+    and recursive LLM callback capability.
     """
     if not request.code or not request.code.strip():
         raise HTTPException(
@@ -61,6 +59,25 @@ async def execute_code(request: CodeRequest) -> CodeResponse:
     stdout_capture = io.StringIO()
 
     try:
+        # Define the LLM callback function
+        def ask_llm(prompt: str) -> str:
+            """
+            Synchronous callback to query the Brain/LLM from inside the sandbox.
+            Used for Recursive RLM patterns.
+            """
+            brain_url = os.getenv("BRAIN_URL", "http://brain:8080")
+            try:
+                # Use synchronous Client for the exec() context
+                with httpx.Client(timeout=60.0) as client:
+                    response = client.post(
+                        f"{brain_url}/chat",
+                        json={"message": prompt}
+                    )
+                    response.raise_for_status()
+                    return response.json().get("response", "")
+            except Exception as e:
+                return f"LLM Error: {str(e)}"
+
         # Create limited globals/locals for execution
         # Only allow safe built-ins
         safe_globals = {
@@ -91,12 +108,16 @@ async def execute_code(request: CodeRequest) -> CodeResponse:
                 "type": type,
                 "help": help,
                 "__import__": __import__,
+                "ask_llm": ask_llm,  # RLM capability
             }
         }
 
         # Use same namespace for globals and locals to support recursion
-        # Functions need to reference themselves in the same namespace
         namespace: Dict[str, Any] = safe_globals.copy()
+        
+        # Inject context variables (e.g. CORPUS text)
+        if request.context:
+            namespace.update(request.context)
 
         # Run code with stdout capture
         with contextlib.redirect_stdout(stdout_capture):
@@ -129,9 +150,7 @@ async def execute_code(request: CodeRequest) -> CodeResponse:
         )
 
     except Exception as e:
-        # Capture full traceback for debugging
         error_msg = f"{type(e).__name__}: {str(e)}"
-
         return CodeResponse(
             status="error",
             error=error_msg

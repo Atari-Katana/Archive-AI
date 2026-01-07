@@ -73,7 +73,7 @@ def get_basic_tools() -> ToolRegistry:
 ### Via API (using curl):
 
 ```bash
-curl -X POST http://localhost:8080/agent \
+curl -X POST http://localhost:8081/agent \
   -H "Content-Type: application/json" \
   -d '{
     "task": "What'\''s the weather in San Francisco?",
@@ -87,7 +87,7 @@ curl -X POST http://localhost:8080/agent \
 ```python
 import requests
 
-response = requests.post('http://localhost:8080/agent', json={
+response = requests.post('http://localhost:8081/agent', json={
     'task': 'What is the weather in San Francisco?',
     'max_steps': 5,
     'tools': 'basic'
@@ -125,7 +125,7 @@ print(response.json())
 
 ## Part 4: Using in the UI
 
-1. Open the Archive-AI web interface at `http://localhost:8080/ui`
+1. Open the Archive-AI web interface at `http://localhost:8081/ui`
 2. Click the **"Basic Agent"** or **"Advanced"** mode button
 3. Type your question: "What's the weather in Boston?"
 4. The agent will automatically use your tool!
@@ -215,7 +215,7 @@ Check the `steps` array in the response - it shows all thoughts and actions.
 **File Locations:**
 - Tools: `/brain/tools/`
 - Agent code: `/brain/agents.py`
-- API docs: `http://localhost:8080/docs`
+- API docs: `http://localhost:8081/docs`
 
 **Key Endpoints:**
 - `/agent` - Run basic agent
@@ -268,7 +268,7 @@ registry.register_tool("crypto_price", get_crypto_price)
 
 Use it:
 ```bash
-curl -X POST http://localhost:8080/agent \
+curl -X POST http://localhost:8081/agent \
   -H "Content-Type: application/json" \
   -d '{"task": "What is the price of Bitcoin?"}'
 ```

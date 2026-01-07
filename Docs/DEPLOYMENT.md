@@ -294,7 +294,7 @@ docker-compose -f docker-compose.prod.yml logs [service]
 docker ps -a
 
 # Verify ports not in use
-sudo netstat -tulpn | grep -E '8080|6379|8000'
+sudo netstat -tulpn | grep -E .8081|6379|8000'
 ```
 
 ### High Memory Usage
@@ -303,7 +303,7 @@ sudo netstat -tulpn | grep -E '8080|6379|8000'
 docker exec archive-redis redis-cli INFO memory
 
 # Trigger manual archival
-curl -X POST http://localhost:8080/admin/archive_old_memories
+curl -X POST http://localhost:8081/admin/archive_old_memories
 
 # Adjust ARCHIVE_KEEP in .env (default 1000)
 ```
