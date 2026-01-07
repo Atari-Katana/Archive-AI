@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from config import config
+from stream_handler import stream_handler
 
 
 class AgentState(Enum):
@@ -131,6 +132,31 @@ class ReActAgent:
         """Async context manager exit"""
         if self.own_client and self.http_client:
             await self.http_client.aclose()
+
+    async def _save_procedural_memory(self, question: str, result: AgentResult):
+        """
+        Save the successful problem-solving process to memory.
+        This gives the agent 'procedural memory' of how it solved tasks.
+        """
+        if not result.success:
+            return
+
+        try:
+            # Construct summary
+            actions = [step.action for step in result.steps if step.action]
+            summary = (
+                f"Procedural Memory: To solve the task '{question}', "
+                f"I performed the following actions: {', '.join(actions)}. "
+                f"The final outcome was: {result.answer}"
+            )
+
+            # Inject into memory stream
+            # The memory worker will pick this up and store it if it has high surprise/salience
+            await stream_handler.capture_input(summary)
+            
+        except Exception as e:
+            # Don't fail the agent if memory save fails
+            print(f"Failed to save procedural memory: {e}")
 
     def _build_prompt(
         self,
@@ -313,12 +339,17 @@ Question: {question}
                     current_step.observation = "Task complete"
                     steps.append(current_step)
 
-                    return AgentResult(
+                    result = AgentResult(
                         answer=parsed["action_input"],
                         steps=steps,
                         total_steps=len(steps),
                         success=True
                     )
+                    
+                    # Save procedural memory
+                    await self._save_procedural_memory(question, result)
+                    
+                    return result
 
                 # Execute action
                 if parsed["action"]:

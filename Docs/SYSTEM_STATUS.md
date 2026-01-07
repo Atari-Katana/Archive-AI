@@ -75,6 +75,7 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 - ✅ **Code Execution** - Fixed over-quoting issues; successfully runs Python logic
 - ✅ **Sandbox Security** - Verified isolation; allows safe imports (`hashlib`, `math`)
 - ✅ **Web Search** - Resilient DuckDuckGo/Wikipedia fallback integration
+- ✅ **Procedural Memory** - Agents auto-summarize and store successful task workflows
 
 ### Phase 4: UI & Integration (COMPLETE)
 - ✅ **Web UI** - Modern responsive design (Port 8888)
