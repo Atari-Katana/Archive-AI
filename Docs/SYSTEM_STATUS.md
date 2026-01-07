@@ -1,7 +1,7 @@
 # Archive-AI System Status Report
 
-**Generated:** 2026-01-06
-**System Version:** v7.5.1
+**Generated:** 2026-01-07
+**System Version:** v7.5.2
 **Overall Progress:** Phase 4 - System Validation Complete
 **Current Phase:** Phase 5 - Advanced Features & Tuning
 
@@ -44,7 +44,7 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 │  (Speed)     │  (Reasoning) │  (Execution)  │
 │              │              │               │
 │  vLLM        │  llama.cpp   │  Isolated     │
-│  Qwen 2.5-7B │  DeepSeek-R1 │  Python       │
+│  Llama-3.1   │  DeepSeek-R1 │  Python       │
 │  AWQ (GPU)   │  GGUF (GPU)  │  Runtime      │
 │  ~6GB VRAM   │  ~5GB VRAM   │               │
 └──────────────┴──────────────┴───────────────┘
@@ -57,7 +57,7 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 ### Phase 1: Infrastructure (COMPLETE)
 - ✅ **Redis Stack** - State engine with vector search (Persistent)
 - ✅ **Code Sandbox** - Isolated Python execution with stdlib support
-- ✅ **Vorpal Engine** - vLLM with Qwen 2.5-7B-AWQ (GPU Accelerated)
+- ✅ **Vorpal Engine** - vLLM with Llama-3.1-8B-AWQ (GPU Accelerated)
 - ✅ **Goblin Engine** - llama.cpp with DeepSeek-R1-Distill-Qwen-7B (GPU Accelerated)
 - ✅ **Dual-Engine Orchestration** - Both engines running simultaneously on 16GB VRAM
 
@@ -74,11 +74,12 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 - ✅ **Tool Registry** - 11 tools active
 - ✅ **Code Execution** - Fixed over-quoting issues; successfully runs Python logic
 - ✅ **Sandbox Security** - Verified isolation; allows safe imports (`hashlib`, `math`)
+- ✅ **Web Search** - Resilient DuckDuckGo/Wikipedia fallback integration
 
 ### Phase 4: UI & Integration (COMPLETE)
 - ✅ **Web UI** - Modern responsive design (Port 8888)
 - ✅ **Flutter GUI** - Native desktop client prototype
-- ✅ **Live Status** - UI correctly reports active model
+- ✅ **Live Status** - UI reports active model and real-time performance meters (VRAM/RAM)
 - ✅ **System Validation** - Passed comprehensive system test suite (Tests 2.1 - 5.1)
 
 ---
@@ -96,20 +97,21 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 
 ## 🧪 Testing Status
 
-### System Validation (2026-01-06)
+### System Validation (2026-01-07)
 - ✅ **Connectivity:** Direct to Vorpal (PASS)
 - ✅ **Memory Injection:** High-surprise facts stored (PASS)
 - ✅ **Memory Recall:** Agent retrieves facts from vector store (PASS)
 - ✅ **Persistence:** Memory survives full stack restart (PASS)
 - ✅ **Adversarial:** System respects surprise logic over user commands (PASS)
 - ✅ **Sandbox:** Code execution works with library imports (PASS)
+- ✅ **Web Search:** Multi-stage fallback finds real-time info (PASS)
 
 ---
 
 ## 🔧 Configuration
 
 ### Model Configuration
-- **Vorpal:** Qwen/Qwen2.5-7B-Instruct-AWQ
+- **Vorpal:** Meta-Llama-3.1-8B-Instruct-AWQ
   - Format: AWQ (4-bit quantized)
   - VRAM: ~6GB
   - Max context: 4096 tokens
@@ -128,5 +130,5 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 
 ---
 
-**Last Updated:** 2026-01-06
+**Last Updated:** 2026-01-07
 **Status:** Operational / Production Ready
