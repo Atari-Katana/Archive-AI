@@ -18,29 +18,31 @@ async function updateSystemStatus() {
         if (metricsResp.ok) {
             const metrics = await metricsResp.json();
             
-            // System Memory (RAM)
+            // System Memory (RAM) - Convert MB to GB
             if (metrics.system) {
-                const ramUsed = (metrics.system.memory_used_gb || 0).toFixed(1);
-                const ramTotal = (metrics.system.memory_total_gb || 0).toFixed(1);
+                const ramUsed = (metrics.system.memory_used_mb / 1024).toFixed(1);
+                const ramTotal = (metrics.system.memory_total_mb / 1024).toFixed(1);
                 document.getElementById('ramStatus').textContent = `${ramUsed} / ${ramTotal} GB`;
-            }
 
-            // GPU Memory (VRAM) - Assuming single GPU for now
-            if (metrics.gpu && metrics.gpu.length > 0) {
-                const gpu = metrics.gpu[0];
-                const vramUsed = (gpu.memory_used_gb || 0).toFixed(1);
-                const vramTotal = (gpu.memory_total_gb || 0).toFixed(1);
-                document.getElementById('vramStatus').textContent = `${vramUsed} / ${vramTotal} GB`;
-            }
+                // GPU Memory (VRAM)
+                // Backend might return null if running in container without GPU visibility
+                if (metrics.system.gpu_memory_used_mb !== null && metrics.system.gpu_memory_total_mb !== null) {
+                    const vramUsed = (metrics.system.gpu_memory_used_mb / 1024).toFixed(1);
+                    const vramTotal = (metrics.system.gpu_memory_total_mb / 1024).toFixed(1);
+                    document.getElementById('vramStatus').textContent = `${vramUsed} / ${vramTotal} GB`;
+                } else {
+                    document.getElementById('vramStatus').textContent = "-- / -- GB";
+                }
 
-            // Token Speeds (Placeholder logic - needs backend support for real-time t/s)
-            // Ideally, the backend metrics should provide 'vorpal_tps' and 'goblin_tps'
-            // For now, we'll display "Idle" or the last known speed if available
-            const vorpalSpeed = metrics.vorpal_tps ? metrics.vorpal_tps.toFixed(1) : '--';
-            const goblinSpeed = metrics.goblin_tps ? metrics.goblin_tps.toFixed(1) : '--';
-            
-            document.getElementById('vorpalSpeed').textContent = `${vorpalSpeed} t/s`;
-            document.getElementById('goblinSpeed').textContent = `${goblinSpeed} t/s`;
+                // Token Speed
+                // Backend provides a global tokens_per_sec
+                const tps = metrics.system.tokens_per_sec ? metrics.system.tokens_per_sec.toFixed(1) : '--';
+                
+                // For now, assign the same speed to Vorpal as it's the primary engine
+                document.getElementById('vorpalSpeed').textContent = `${tps} t/s`;
+                // Goblin speed isn't tracked separately in current metrics
+                document.getElementById('goblinSpeed').textContent = `-- t/s`;
+            }
         }
 
     } catch (error) {
