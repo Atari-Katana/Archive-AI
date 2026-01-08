@@ -74,9 +74,9 @@ bash scripts/health-check.sh
 ```
 
 **What you get:**
-- **Vorpal Engine:** Qwen 2.5-7B-Instruct-AWQ (~6GB VRAM) for fast chat/routing
-- **Goblin Engine:** DeepSeek-R1-Distill-Qwen-7B (~5-6GB VRAM) for reasoning/coding
-- **Total VRAM:** ~14GB (fits 16GB GPU with 2GB headroom)
+- **Vorpal Engine:** Llama-3.1-8B-Instruct-AWQ (~5.9GB VRAM) for fast chat/routing
+- **Goblin Engine:** Qwen2.5-7B-Instruct-Q4_K_M (~4.7GB VRAM) for reasoning/general tasks
+- **Total VRAM:** ~13.2GB (fits 16GB GPU with 2.8GB headroom)
 - **Web UI:** Automatically started on port 8888
 - **Metrics Dashboard:** Real-time performance monitoring (http://localhost:8081/ui/metrics-panel.html)
 - **Config Panel:** Web-based configuration editor (http://localhost:8081/ui/config-panel.html)
@@ -116,10 +116,10 @@ bash scripts/health-check.sh
 
 ### Deployment Modes
 
-**Mode 1: Dual-Engine (AWQ 7B)** - `./go.sh`
-- Vorpal: Qwen 2.5-7B-Instruct-AWQ (speed, routing, chat)
-- Goblin: DeepSeek-R1-Distill-Qwen-7B (reasoning, coding, agents)
-- VRAM: ~14GB total (fits 16GB GPU)
+**Mode 1: Dual-Engine (AWQ + GGUF 7B)** - `./go.sh`
+- Vorpal: Llama-3.1-8B-Instruct-AWQ (speed, routing, chat)
+- Goblin: Qwen2.5-7B-Instruct-Q4_K_M (reasoning, general tasks)
+- VRAM: ~13.2GB total (fits 16GB GPU)
 - **Recommended for production**
 
 **Mode 2: Single-Engine (Base 3B)** - `docker-compose up -d`
@@ -135,8 +135,8 @@ See [CONFIG.md](Docs/CONFIG.md) for detailed configuration guide.
 |---------|---------|------------|------|
 | **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8081 |
 | **Bifrost** | Semantic Router | `maximhq/bifrost` | (Internal) |
-| **Vorpal** | Speed Engine (LLM) | vLLM + Qwen 7B AWQ / 3B | 8000 |
-| **Goblin** | Reasoning Engine | llama.cpp + DeepSeek 7B | 8082 |
+| **Vorpal** | Speed Engine (LLM) | vLLM + Llama-3.1-8B AWQ | 8000 |
+| **Goblin** | Reasoning Engine | llama.cpp + Qwen2.5-7B | 8082 |
 | **Redis** | State + Vector DB | Redis Stack + RediSearch | 6379 |
 | **Voice** | Speech I/O | Faster-Whisper + F5-TTS | 8001 |
 | **Sandbox** | Code Execution | Isolated Python | 8003 |
@@ -353,6 +353,7 @@ curl -X POST http://localhost:8081/agent/advanced \
 - **[CONFIG.md](Docs/CONFIG.md)** - Configuration guide & deployment modes
 - **[DEPLOYMENT.md](Docs/DEPLOYMENT.md)** - Production deployment guide
 - **[PERFORMANCE.md](Docs/PERFORMANCE.md)** - Performance analysis & optimization
+- **[RECURSIVE_LANGUAGE_MODEL.md](Docs/RECURSIVE_LANGUAGE_MODEL.md)** - RLM infinite context processing ✨ NEW
 
 ### Development
 - **[Archive-AI System Atlas](Docs/Archive-AI_System_Atlas_v7.5_REVISED.md)** - Architecture spec

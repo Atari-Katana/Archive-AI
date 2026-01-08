@@ -20,7 +20,7 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 ### Hardware Configuration
 - **GPU:** NVIDIA RTX 5060 Ti (16GB VRAM)
 - **RAM:** 64GB system memory
-- **Current VRAM Usage:** ~11.7GB / 16GB (72%) - **Stable**
+- **Current VRAM Usage:** ~13.2GB / 16GB (81%) - **Stable**
 - **CPU Offloading:** Zero - All inference on GPU
 - **Deployment:** Dual-Engine Mode (Vorpal AWQ + Goblin GGUF-CUDA)
 
@@ -45,9 +45,9 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 │  (Speed)     │  (Reasoning) │  (Execution)  │
 │              │              │               │
 │  vLLM        │  llama.cpp   │  Isolated     │
-│  Llama-3.1   │  DeepSeek-R1 │  Python       │
+│  Llama-3.1   │  Qwen2.5-7B  │  Python       │
 │  AWQ (GPU)   │  GGUF (GPU)  │  Runtime      │
-│  ~6GB VRAM   │  ~5GB VRAM   │               │
+│  ~5.9GB VRAM │  ~4.7GB VRAM │               │
 └──────────────┴──────────────┴───────────────┘
 ```
 
@@ -119,10 +119,11 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
   - VRAM: ~5.9GB (model + KV cache)
   - Max context: 3760 tokens
   - KV cache: 0.48 GiB GPU
-- **Goblin:** DeepSeek-R1-Distill-Qwen-7B-Q4_K_M
-  - Format: GGUF (4-bit quantized)
-  - VRAM: ~5.1GB
-  - Max context: 8192 tokens
+- **Goblin:** Qwen2.5-7B-Instruct-Q4_K_M
+  - Format: GGUF (4-bit quantized, split files)
+  - VRAM: ~4.7GB (model + KV cache)
+  - Parameters: 7.6 billion
+  - Max context: 131,072 tokens (training) / 8,192 tokens (active)
   - Offload: 38 layers (Full GPU)
 
 ### Service URLs
@@ -159,6 +160,32 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 ✅ Vorpal health: 200 OK (max_model_len=3760)
 ✅ Brain API: Healthy and responding
 ✅ GPU memory: 11.7 GB / 16.3 GB (72% usage)
+```
+
+### 2026-01-08 - Goblin Model Switch to Qwen2.5-7B-Instruct
+**Model Change:**
+- **FROM:** DeepSeek-R1-Distill-Qwen-7B-Q4_K_M (4.4GB)
+- **TO:** Qwen2.5-7B-Instruct-Q4_K_M (4.68GB)
+
+**New Model Specifications:**
+- Repository: Qwen/Qwen2.5-7B-Instruct-GGUF
+- Parameters: 7.6 billion
+- Context: 131K tokens (training) / 8K tokens (active)
+- Quantization: Q4_K_M (split GGUF files)
+- GPU Layers: 38 (full offload)
+
+**Performance Impact:**
+- VRAM usage: 11.7GB → 13.2GB (81% GPU utilization)
+- Model VRAM: ~4.7GB (model + KV cache)
+- Memory increase: +1.5GB vs previous model
+- Zero CPU offloading maintained
+
+**Verification:**
+```bash
+✅ Math test: 15×23=345 (correct)
+✅ Goblin health: 200 OK
+✅ Model loaded: qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf
+✅ GPU memory: 13.2 GB / 16.3 GB (81% usage)
 ```
 
 ---
