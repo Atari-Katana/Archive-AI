@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 
 void main() {
   runApp(const BasicChatApp());
@@ -344,9 +345,20 @@ class _ChatScreenState extends State<ChatScreen> {
                               ],
                             ),
                           ),
-                        Text(
-                          text,
-                          style: TextStyle(color: textColor),
+                        MarkdownBody(
+                          data: text,
+                          styleSheet: MarkdownStyleSheet(
+                            p: TextStyle(color: textColor),
+                            code: TextStyle(
+                              backgroundColor: isUser ? Colors.deepPurple.shade700 : Colors.grey.shade300,
+                              color: isUser ? Colors.white : Colors.black87,
+                              fontFamily: 'monospace',
+                            ),
+                            codeblockDecoration: BoxDecoration(
+                              color: isUser ? Colors.deepPurple.shade700 : Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
                         ),
                       ],
                     ),

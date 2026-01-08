@@ -4,6 +4,19 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
+// Configure Marked.js with Highlight.js
+if (typeof marked !== 'undefined') {
+    marked.setOptions({
+        highlight: function(code, lang) {
+            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(code, { language }).value;
+        },
+        langPrefix: 'hljs language-',
+        breaks: true,
+        gfm: true
+    });
+}
+
 // Fetch and display system status
 async function updateSystemStatus() {
     try {
@@ -118,7 +131,13 @@ function createMessage(content, type) {
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    contentDiv.textContent = content;
+    
+    // Render Markdown if available, otherwise use plain text
+    if (typeof marked !== 'undefined') {
+        contentDiv.innerHTML = marked.parse(content);
+    } else {
+        contentDiv.textContent = content;
+    }
 
     msgDiv.appendChild(contentDiv);
 
@@ -141,7 +160,14 @@ function createAgentMessage(response, data) {
     
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    contentDiv.textContent = response;
+    
+    // Render Markdown if available
+    if (typeof marked !== 'undefined') {
+        contentDiv.innerHTML = marked.parse(response);
+    } else {
+        contentDiv.textContent = response;
+    }
+    
     msgDiv.appendChild(contentDiv);
 
     if (data.steps && data.steps.length > 0) {
