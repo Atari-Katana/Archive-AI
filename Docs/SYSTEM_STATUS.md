@@ -1,7 +1,7 @@
 # Archive-AI System Status Report
 
-**Generated:** 2026-01-07
-**System Version:** v7.5.2
+**Generated:** 2026-01-08
+**System Version:** v7.5.3
 **Overall Progress:** Phase 4 - System Validation Complete
 **Current Phase:** Phase 5 - Advanced Features & Tuning
 
@@ -20,7 +20,8 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 ### Hardware Configuration
 - **GPU:** NVIDIA RTX 5060 Ti (16GB VRAM)
 - **RAM:** 64GB system memory
-- **Current VRAM Usage:** ~13.8GB / 16GB (86%) - **Stable**
+- **Current VRAM Usage:** ~11.7GB / 16GB (72%) - **Stable**
+- **CPU Offloading:** Zero - All inference on GPU
 - **Deployment:** Dual-Engine Mode (Vorpal AWQ + Goblin GGUF-CUDA)
 
 ### Service Architecture
@@ -115,11 +116,12 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 ### Model Configuration
 - **Vorpal:** Meta-Llama-3.1-8B-Instruct-AWQ
   - Format: AWQ (4-bit quantized)
-  - VRAM: ~6GB
-  - Max context: 4096 tokens
+  - VRAM: ~5.9GB (model + KV cache)
+  - Max context: 3760 tokens
+  - KV cache: 0.48 GiB GPU
 - **Goblin:** DeepSeek-R1-Distill-Qwen-7B-Q4_K_M
   - Format: GGUF (4-bit quantized)
-  - VRAM: ~5GB
+  - VRAM: ~5.1GB
   - Max context: 8192 tokens
   - Offload: 38 layers (Full GPU)
 
@@ -132,5 +134,34 @@ Archive-AI is a **local-first AI cognitive framework** that has successfully pas
 
 ---
 
-**Last Updated:** 2026-01-07
+## 🔨 Recent Fixes & Optimizations
+
+### 2026-01-08 - GPU Memory Optimization & Brain API Fix
+**Issues Resolved:**
+1. **Vorpal initialization failure** - GPU memory contention with Goblin
+2. **Brain API crash** - Undefined `target_provider` variable in chat endpoint
+
+**Solutions Implemented:**
+- Reduced Vorpal `max_model_len` from 4096 → 3760 tokens
+- Updated `docker-compose.awq-7b.yml` with optimized memory configuration
+- Fixed Brain API bug in `brain/main.py:778` (changed `target_provider` → `used_model`)
+- Rebuilt Brain container with fix
+
+**Performance Impact:**
+- VRAM usage reduced from 13.8GB → 11.7GB (15% improvement)
+- Zero CPU offloading confirmed - all inference on GPU
+- KV cache: 3,952 tokens (~0.48 GiB) fully on GPU
+- System stability improved with 28% GPU headroom
+
+**Verification:**
+```bash
+✅ Chat endpoint tested: {"response":"4.","engine":"bifrost:/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4"}
+✅ Vorpal health: 200 OK (max_model_len=3760)
+✅ Brain API: Healthy and responding
+✅ GPU memory: 11.7 GB / 16.3 GB (72% usage)
+```
+
+---
+
+**Last Updated:** 2026-01-08
 **Status:** Operational / Production Ready

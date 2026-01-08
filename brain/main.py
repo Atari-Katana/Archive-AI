@@ -9,11 +9,12 @@ import httpx
 import logging
 import os
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from collections import defaultdict
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 try:
     import psutil
     PSUTIL_AVAILABLE = True
@@ -28,6 +29,38 @@ from agents import ReActAgent, ToolRegistry, AgentStep, get_basic_tools, get_adv
 from memory.vector_store import vector_store
 from metrics_collector import router as metrics_router, collector
 from config_api import router as config_router
+
+
+# Simple in-memory rate limiter
+class RateLimiter:
+    """Simple in-memory rate limiter for public endpoints"""
+
+    def __init__(self):
+        # Track: {ip_address: [(timestamp1, timestamp2, ...)]}
+        self.requests = defaultdict(list)
+        self.window_seconds = 60  # 1 minute window
+        self.max_requests = 30  # 30 requests per minute
+
+    def is_allowed(self, client_ip: str) -> bool:
+        """Check if request from client_ip is allowed"""
+        now = time.time()
+        cutoff = now - self.window_seconds
+
+        # Clean old requests outside the window
+        self.requests[client_ip] = [
+            req_time for req_time in self.requests[client_ip]
+            if req_time > cutoff
+        ]
+
+        # Check if under limit
+        if len(self.requests[client_ip]) < self.max_requests:
+            self.requests[client_ip].append(now)
+            return True
+
+        return False
+
+
+rate_limiter = RateLimiter()
 
 
 app = FastAPI(
@@ -73,6 +106,10 @@ chain-of-verification, ReAct agents, and memory management.
         {
             "name": "memory",
             "description": "Memory storage and semantic search"
+        },
+        {
+            "name": "voice",
+            "description": "Speech-to-text and text-to-speech endpoints"
         },
         {
             "name": "health",
@@ -140,17 +177,17 @@ async def startup():
     if config.ASYNC_MEMORY:
         await memory_worker.connect()
         worker_task = asyncio.create_task(memory_worker.run())
-        print("[Brain] Memory worker started")
+        logger.info("Memory worker started")
 
     # Start archival worker if enabled (Chunk 5.6)
     if config.ARCHIVE_ENABLED:
         from workers.archiver import archiver
         await archiver.start()
-        print("[Brain] Memory archival worker started")
+        logger.info("Memory archival worker started")
 
     # Start metrics collection (Task 3.2)
     asyncio.create_task(collector.start_collection())
-    print("[Brain] Metrics collector started")
+    logger.info("Metrics collector started")
 
 
 @app.on_event("shutdown")
@@ -337,6 +374,55 @@ class CodeAssistResponse(BaseModel):
     error: Optional[str] = None
 
 
+class ArchiveSearchRequest(BaseModel):
+    """Archive search request model (Admin endpoints)"""
+    query: str
+    max_results: int = 10
+
+
+class HealthResponse(BaseModel):
+    """Health check response model"""
+    status: str
+    service: str
+    version: str
+
+
+class DetailedHealthResponse(BaseModel):
+    """Detailed health check response model"""
+    status: str
+    vorpal_url: str
+    vorpal_model: str
+    async_memory: Dict[str, Any]
+
+
+class ArchiveStatsResponse(BaseModel):
+    """Archive statistics response model"""
+    total_archive_files: int
+    total_archived_memories: int
+    oldest_archive_date: Optional[str]
+    newest_archive_date: Optional[str]
+    archive_directory: str
+
+
+class ArchiveSearchResponse(BaseModel):
+    """Archive search response model"""
+    query: str
+    results: List[Dict[str, Any]]
+    count: int
+
+
+class VoiceTranscriptionResponse(BaseModel):
+    """Voice transcription response model"""
+    text: str
+    language: Optional[str] = None
+    duration: Optional[float] = None
+
+
+class VoiceSynthesisRequest(BaseModel):
+    """Voice synthesis request model"""
+    text: str
+
+
 class SystemMetrics(BaseModel):
     """System resource metrics"""
     cpu_percent: Optional[float] = None
@@ -373,7 +459,7 @@ class MetricsResponse(BaseModel):
     version: str
 
 
-@app.get("/", tags=["health"])
+@app.get("/", response_model=HealthResponse, tags=["health"])
 async def root():
     """
     Root endpoint - Basic health check
@@ -387,7 +473,7 @@ async def root():
     }
 
 
-@app.get("/health", tags=["health"])
+@app.get("/health", response_model=DetailedHealthResponse, tags=["health"])
 async def health():
     """
     Detailed health check
@@ -431,7 +517,7 @@ async def get_gpu_metrics() -> tuple[Optional[float], Optional[float], Optional[
             ['nvidia-smi', '--query-gpu=memory.used,memory.total', '--format=csv,noheader,nounits'],
             capture_output=True,
             text=True,
-            timeout=2.0
+            timeout=config.HEALTH_CHECK_TIMEOUT
         )
         if result.returncode == 0:
             used, total = result.stdout.strip().split(',')
@@ -450,7 +536,7 @@ async def get_tokens_per_sec() -> Optional[float]:
     Uses inter-token latency from vLLM metrics.
     """
     try:
-        async with httpx.AsyncClient(timeout=2.0) as client:
+        async with httpx.AsyncClient(timeout=config.HEALTH_CHECK_TIMEOUT) as client:
             response = await client.get(f"{config.VORPAL_URL}/metrics")
             if response.status_code != 200:
                 return None
@@ -532,7 +618,7 @@ async def get_metrics() -> MetricsResponse:
         cpu_percent=snapshot.cpu_percent,
         memory_percent=snapshot.memory_percent,
         memory_used_mb=snapshot.memory_mb,
-        memory_total_mb=psutil.virtual_memory().total / (1024 * 1024),
+        memory_total_mb=psutil.virtual_memory().total / (1024 * 1024) if PSUTIL_AVAILABLE else None,
         gpu_memory_used_mb=snapshot.gpu_memory_used_mb,
         gpu_memory_total_mb=snapshot.gpu_memory_total_mb,
         gpu_memory_percent=snapshot.gpu_memory_percent,
@@ -610,7 +696,7 @@ async def get_metrics() -> MetricsResponse:
 
 
 @app.post("/chat", response_model=ChatResponse, tags=["core"])
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(request: ChatRequest, http_request: Request) -> ChatResponse:
     """
     Direct LLM conversation with Bifrost semantic routing.
 
@@ -619,6 +705,8 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
     Messages are captured in Redis streams and may be stored in the vector
     store if they have high surprise scores (>= 0.7).
+
+    **Rate Limit:** 30 requests per minute per IP address.
 
     **Example Request:**
     ```json
@@ -637,28 +725,31 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
     Args:
         request: ChatRequest with user message
+        http_request: HTTP request for rate limiting
 
     Returns:
         ChatResponse with routed reply
     """
+    # Rate limiting check
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Maximum 30 requests per minute."
+        )
+
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
     # Capture input to Redis Stream (non-blocking, fire and forget)
     await stream_handler.capture_input(request.message)
 
-    # Determine which engine to use through Bifrost
-    # Simple logic: long queries or complex keywords go to Goblin
-    reasoning_keywords = ["solve", "calculate", "explain", "why", "how", "code", "python", "algorithm", "think"]
-    use_goblin = len(request.message) > 200 or any(kw in request.message.lower() for kw in reasoning_keywords)
-    
-    target_provider = "goblin" if use_goblin else "vorpal"
-    target_model = "goblin" if use_goblin else config.VORPAL_MODEL
-    
-    # Bifrost requires provider/model format
-    bifrost_model = f"{target_provider}/{target_model}"
-    
-    logger.info(f"Routing message to Bifrost (Target: {bifrost_model})")
+    # Route through Bifrost gateway
+    # Bifrost handles semantic routing to determine the appropriate model
+    # Default to vorpal, but Bifrost may override based on query complexity
+    bifrost_model = f"vorpal/{config.VORPAL_MODEL}"
+
+    logger.info(f"Routing message to Bifrost (Model: {bifrost_model})")
 
     try:
         # Proxy request to Bifrost (OpenAI-compatible API)
@@ -679,12 +770,13 @@ async def chat(request: ChatRequest) -> ChatResponse:
             response.raise_for_status()
             result = response.json()
             
-            # Extract response text
+            # Extract response text and model info
             completion_text = result['choices'][0]['message']['content']
+            used_model = result.get('model', bifrost_model)
 
             return ChatResponse(
                 response=completion_text,
-                engine=f"bifrost:{target_provider}"
+                engine=f"bifrost:{used_model}"
             )
 
     except httpx.HTTPError as e:
@@ -716,7 +808,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
 
 @app.post("/verify", response_model=VerifyResponse, tags=["core"])
-async def verify(request: VerifyRequest) -> VerifyResponse:
+async def verify(request: VerifyRequest, http_request: Request) -> VerifyResponse:
     """
     Chat with Chain of Verification
 
@@ -725,6 +817,8 @@ async def verify(request: VerifyRequest) -> VerifyResponse:
     2. **Plan** verification questions
     3. **Execute** independent verification
     4. **Revise** if inconsistencies found
+
+    **Rate Limit:** 30 requests per minute per IP address.
 
     **Example Request:**
     ```json
@@ -746,10 +840,19 @@ async def verify(request: VerifyRequest) -> VerifyResponse:
 
     Args:
         request: VerifyRequest with user message
+        http_request: HTTP request for rate limiting
 
     Returns:
         VerifyResponse with verification details and final response
     """
+    # Rate limiting check
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    if not rate_limiter.is_allowed(client_ip):
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit exceeded. Maximum 30 requests per minute."
+        )
+
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
@@ -1109,6 +1212,9 @@ async def list_memories(limit: int = 50, offset: int = 0) -> MemoryListResponse:
         MemoryListResponse with memories and total count
     """
     try:
+        # Ensure Redis connection is active
+        vector_store.ensure_connected()
+
         # Get all memory keys using SCAN
         cursor = 0
         all_keys = []
@@ -1161,6 +1267,12 @@ async def list_memories(limit: int = 50, offset: int = 0) -> MemoryListResponse:
             total=len(all_keys)
         )
 
+    except RuntimeError as e:
+        # Redis connection issue
+        raise HTTPException(
+            status_code=503,
+            detail=f"Memory service unavailable: {str(e)}"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -1219,6 +1331,9 @@ async def search_memories(request: MemorySearchRequest) -> MemoryListResponse:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
 
     try:
+        # Ensure Redis connection is active
+        vector_store.ensure_connected()
+
         # Search using vector similarity
         results = vector_store.search_similar(
             query_text=request.query,
@@ -1245,6 +1360,12 @@ async def search_memories(request: MemorySearchRequest) -> MemoryListResponse:
             total=len(memories)
         )
 
+    except RuntimeError as e:
+        # Redis connection issue
+        raise HTTPException(
+            status_code=503,
+            detail=f"Memory service unavailable: {str(e)}"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -1712,7 +1833,7 @@ async def trigger_manual_archival():
         )
 
 
-@app.get("/admin/archive_stats", tags=["admin"])
+@app.get("/admin/archive_stats", response_model=ArchiveStatsResponse, tags=["admin"])
 async def get_archive_statistics():
     """
     Get statistics about archived memories (Chunk 5.6).
@@ -1733,26 +1854,29 @@ async def get_archive_statistics():
         )
 
 
-@app.post("/admin/search_archive", tags=["admin"])
-async def search_archived_memories(query: str, max_results: int = 10):
+@app.post("/admin/search_archive", response_model=ArchiveSearchResponse, tags=["admin"])
+async def search_archived_memories(request: ArchiveSearchRequest):
     """
     Search archived memories on disk (Chunk 5.6).
 
     Slower than Redis search, but searches all archived memories.
 
     Args:
-        query: Search query string
-        max_results: Maximum number of results (default 10)
+        request: Archive search request with query and max_results
 
     Returns:
         List of matching memories from archive files
     """
     from memory.cold_storage import ColdStorageManager
 
-    if not query or not query.strip():
+    # Validate query
+    if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query cannot be empty")
+    if len(request.query) > 500:
+        raise HTTPException(status_code=400, detail="Query too long (max 500 characters)")
 
-    if max_results < 1 or max_results > 100:
+    # Validate max_results
+    if request.max_results < 1 or request.max_results > 100:
         raise HTTPException(
             status_code=400,
             detail="max_results must be between 1 and 100"
@@ -1760,9 +1884,9 @@ async def search_archived_memories(query: str, max_results: int = 10):
 
     try:
         storage = ColdStorageManager()
-        results = storage.search_archive(query, max_results)
+        results = storage.search_archive(request.query, request.max_results)
         return {
-            "query": query,
+            "query": request.query,
             "results": results,
             "count": len(results)
         }
@@ -1770,6 +1894,123 @@ async def search_archived_memories(query: str, max_results: int = 10):
         raise HTTPException(
             status_code=500,
             detail=f"Archive search error: {str(e)}"
+        )
+
+
+# ========== VOICE ENDPOINTS ==========
+
+
+@app.post("/voice/transcribe", response_model=VoiceTranscriptionResponse, tags=["voice"])
+async def transcribe_audio(request: Request):
+    """
+    Transcribe audio to text using Faster-Whisper STT (Chunk 5.3).
+
+    Upload an audio file and get back the transcribed text.
+
+    Args:
+        Audio file in request body (multipart/form-data)
+
+    Returns:
+        Transcription with detected language and duration
+    """
+    if not config.ENABLE_VOICE:
+        raise HTTPException(
+            status_code=503,
+            detail="Voice features are disabled. Set ENABLE_VOICE=true to enable."
+        )
+
+    try:
+        # Get the form data from the request
+        form_data = await request.form()
+        audio_file = form_data.get("audio")
+
+        if not audio_file:
+            raise HTTPException(status_code=400, detail="No audio file provided")
+
+        # Forward to voice service
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Prepare multipart data for voice service
+            files = {
+                "audio": (audio_file.filename, await audio_file.read(), audio_file.content_type)
+            }
+
+            response = await client.post(
+                f"{config.VOICE_URL}/transcribe",
+                files=files
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Voice service error: {response.text}"
+                )
+
+            return response.json()
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Transcription error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Transcription failed: {str(e)}"
+        )
+
+
+@app.post("/voice/synthesize", tags=["voice"])
+async def synthesize_speech(request: VoiceSynthesisRequest):
+    """
+    Synthesize speech from text using F5-TTS (Chunk 5.3).
+
+    Send text and receive a WAV audio file.
+
+    Args:
+        request: Text to synthesize
+
+    Returns:
+        WAV audio file
+    """
+    if not config.ENABLE_VOICE:
+        raise HTTPException(
+            status_code=503,
+            detail="Voice features are disabled. Set ENABLE_VOICE=true to enable."
+        )
+
+    if not request.text or not request.text.strip():
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    try:
+        # Forward to voice service
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            # Send as form data
+            response = await client.post(
+                f"{config.VOICE_URL}/synthesize",
+                data={"text": request.text}
+            )
+
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"Voice service error: {response.text}"
+                )
+
+            # Return the audio file
+            from fastapi.responses import Response
+            return Response(
+                content=response.content,
+                media_type="audio/wav",
+                headers={
+                    "Content-Disposition": "attachment; filename=speech.wav"
+                }
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Speech synthesis error: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Speech synthesis failed: {str(e)}"
         )
 
 

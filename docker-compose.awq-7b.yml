@@ -8,7 +8,7 @@ services:
     environment:
       - VORPAL_MODEL=${VORPAL_MODEL:-/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}
       - VORPAL_GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.45}  # Aim to keep Vorpal around ~6GB
-      - VORPAL_MAX_MODEL_LEN=${VORPAL_MAX_MODEL_LEN:-4096}
+      - VORPAL_MAX_MODEL_LEN=${VORPAL_MAX_MODEL_LEN:-3760}  # Reduced to fit GPU memory with Goblin
       - VORPAL_MAX_NUM_SEQS=${VORPAL_MAX_NUM_SEQS:-64}
     command:
       - "${VORPAL_MODEL:-/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4}"   # Local AWQ model path
@@ -19,7 +19,7 @@ services:
       - "--gpu-memory-utilization"
       - "${VORPAL_GPU_MEMORY_UTILIZATION:-0.45}"
       - "--max-model-len"
-      - "${VORPAL_MAX_MODEL_LEN:-4096}"
+      - "${VORPAL_MAX_MODEL_LEN:-3760}"
       - "--max-num-seqs"
       - "${VORPAL_MAX_NUM_SEQS:-64}"
 
