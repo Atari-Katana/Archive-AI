@@ -27,6 +27,14 @@ class MemoryWorker:
     # Weights for surprise score calculation
     PERPLEXITY_WEIGHT = 0.6
     VECTOR_DISTANCE_WEIGHT = 0.4
+    # Perplexity normalization constants
+    PERPLEXITY_LOG_OFFSET = 1.0  # Offset to prevent log(0)
+    PERPLEXITY_LOG_DIVISOR = 5.0  # Scale factor for normalization
+    PERPLEXITY_FALLBACK = 1.0  # Neutral perplexity when calculation fails
+    # Vector distance constants
+    VECTOR_MAX_NOVELTY = 1.0  # Maximum novelty when no similar memories exist
+    VECTOR_DEFAULT_NOVELTY = 0.5  # Default novelty on error
+    VECTOR_SEARCH_LIMIT = 1  # Number of similar memories to search
     # Retry settings for perplexity calls
     PERPLEXITY_RETRIES = 3
     PERPLEXITY_RETRY_DELAY = 2.0  # seconds
@@ -219,13 +227,13 @@ class MemoryWorker:
                 None,
                 self.vector_store.search_similar,
                 text,
-                1,  # Get closest match only
+                self.VECTOR_SEARCH_LIMIT,
                 None  # No session filter
             )
 
             if not similar:
                 # No existing memories, maximum novelty
-                return 1.0
+                return self.VECTOR_MAX_NOVELTY
 
             # Get similarity score of closest match
             # Similarity scores from cosine distance are [0, 1]
@@ -240,9 +248,9 @@ class MemoryWorker:
             return vector_distance
 
         except Exception as e:
-            print(f"Vector distance calculation error: {e}")
+            logger.error("Vector distance calculation error: %s", e)
             # Default to medium novelty on error
-            return 0.5
+            return self.VECTOR_DEFAULT_NOVELTY
 
     def calculate_surprise_score(
         self,
@@ -264,7 +272,10 @@ class MemoryWorker:
         # Normalize perplexity to [0, 1] range
         # Typical perplexity values: 1-100+
         # Use log scale for better distribution
-        normalized_perplexity = min(1.0, math.log(perplexity + 1) / 5.0)
+        normalized_perplexity = min(
+            1.0,
+            math.log(perplexity + self.PERPLEXITY_LOG_OFFSET) / self.PERPLEXITY_LOG_DIVISOR
+        )
 
         # Calculate weighted surprise score
         surprise = (
@@ -274,7 +285,7 @@ class MemoryWorker:
 
         return surprise
 
-    async def process_entry(self, entry_id: str, entry_data: dict):
+    async def process_entry(self, entry_id: str, entry_data: dict) -> bool:
         """
         Process a single stream entry.
         Calculates surprise score and stores if > threshold.
@@ -282,21 +293,32 @@ class MemoryWorker:
         Args:
             entry_id: Redis stream entry ID
             entry_data: Entry data dict
+
+        Returns:
+            True if processing completed successfully (stored or skipped),
+            False if storage failed and entry should be retried
         """
         message = entry_data.get("message", "")
         timestamp = entry_data.get("timestamp", "")
 
         if not message:
-            return
+            return True  # Empty message, nothing to do
 
         # Calculate perplexity
         perplexity = await self.calculate_perplexity(message)
+        perplexity_failed = False
         if perplexity is None:
-            logger.warning(
-                "Failed to calculate perplexity for: %s...",
-                message[:50]
+            # CRITICAL: Perplexity calculation failed after all retries
+            # Store with fallback value instead of dropping the memory entirely
+            logger.error(
+                "CRITICAL: Failed to calculate perplexity after %s retries for: %s... "
+                "Using fallback perplexity=%s",
+                self.PERPLEXITY_RETRIES,
+                message[:50],
+                self.PERPLEXITY_FALLBACK
             )
-            return
+            perplexity = self.PERPLEXITY_FALLBACK
+            perplexity_failed = True
 
         # Calculate vector distance (novelty)
         vector_distance = await self.calculate_vector_distance(message)
@@ -319,6 +341,12 @@ class MemoryWorker:
         # Store memory if surprising enough
         if surprise_score >= self.SURPRISE_THRESHOLD:
             try:
+                # Include perplexity failure flag in metadata
+                metadata = {
+                    "timestamp": timestamp,
+                    "entry_id": entry_id,
+                    "perplexity_fallback": perplexity_failed
+                }
                 await asyncio.get_event_loop().run_in_executor(
                     None,
                     self.vector_store.store_memory,
@@ -326,13 +354,16 @@ class MemoryWorker:
                     perplexity,
                     surprise_score,
                     "default",  # session_id
-                    {"timestamp": timestamp, "entry_id": entry_id}
+                    metadata
                 )
                 logger.info("Stored memory (surprise >= %s)", self.SURPRISE_THRESHOLD)
+                return True  # Storage successful
             except Exception as e:
                 logger.exception("Storage error: %s", e)
+                return False  # Storage failed, should retry
         else:
             logger.info("Skipped (surprise < %s)", self.SURPRISE_THRESHOLD)
+            return True  # Intentionally skipped, mark as processed
 
     async def run(self):
         """Main worker loop - reads from stream and processes entries"""
@@ -355,13 +386,30 @@ class MemoryWorker:
                 # Process each entry
                 for stream_key, stream_entries in entries:
                     for entry_id, entry_data in stream_entries:
-                        await self.process_entry(entry_id, entry_data)
-                        self.last_id = entry_id
-                        if self.redis_client:
-                            await self.redis_client.set(
-                                config.MEMORY_LAST_ID_KEY,
-                                self.last_id
+                        try:
+                            success = await self.process_entry(entry_id, entry_data)
+                            if success:
+                                # Only update last_id after successful processing
+                                self.last_id = entry_id
+                                if self.redis_client:
+                                    await self.redis_client.set(
+                                        config.MEMORY_LAST_ID_KEY,
+                                        self.last_id
+                                    )
+                            else:
+                                logger.error(
+                                    "Processing failed for entry %s, will retry next iteration",
+                                    entry_id
+                                )
+                                # Don't update last_id - will retry this entry next iteration
+                                break
+                        except Exception as e:
+                            logger.error(
+                                "Failed to process entry %s: %s. Stopping batch to prevent data loss.",
+                                entry_id, e
                             )
+                            # Don't update last_id - will retry this entry next iteration
+                            break
 
             except asyncio.CancelledError:
                 logger.info("Worker cancelled, shutting down...")

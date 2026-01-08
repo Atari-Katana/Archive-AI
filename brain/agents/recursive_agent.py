@@ -75,7 +75,7 @@ class RecursiveAgent(ReActAgent):
             # ... (Simplified for brevity, reusing the raw endpoint call)
             
             try:
-                async with httpx.AsyncClient(timeout=60.0) as client:
+                async with httpx.AsyncClient(timeout=config.AGENT_TIMEOUT) as client:
                     response = await client.post(
                         f"{config.SANDBOX_URL}/execute",
                         json={
@@ -85,18 +85,29 @@ class RecursiveAgent(ReActAgent):
                     )
                     response.raise_for_status()
                     result = response.json()
-                    
-                    stdout = result.get("stdout", "").strip()
-                    stderr = result.get("stderr", "").strip()
-                    
+
+                    # Sandbox returns: {"status": "success/error", "result": "...", "error": "..."}
+                    status = result.get("status", "error")
+                    result_output = result.get("result", "").strip()
+                    error_output = result.get("error", "").strip()
+
                     output = ""
-                    if stdout: output += f"Output:\n{stdout}"
-                    if stderr: output += f"\nErrors:\n{stderr}"
-                    
+                    if result_output:
+                        output += f"Output:\n{result_output}"
+                    if error_output:
+                        output += f"\nErrors:\n{error_output}"
+
                     return output if output else "Code executed (no output)."
-                    
+
+            except httpx.TimeoutException:
+                return "Sandbox Error: Request timed out after 60 seconds. Try processing smaller chunks or simplifying the code."
+            except httpx.HTTPStatusError as e:
+                return f"Sandbox Error: HTTP {e.response.status_code} - {e.response.text}"
+            except httpx.ConnectError:
+                return f"Sandbox Error: Cannot connect to sandbox at {config.SANDBOX_URL}. Is the service running?"
             except Exception as e:
-                return f"Sandbox Error: {str(e)}"
+                logger.exception("Unexpected error in sandbox execution")
+                return f"Sandbox Error: Unexpected error - {type(e).__name__}: {str(e)}"
 
         registry = ToolRegistry()
         registry.register(

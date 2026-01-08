@@ -1,0 +1,4 @@
+{
+  "question": "Find the error message in the logs and explain how to fix it using the ask_llm function.",
+  "corpus": "INFO: System started\nINFO: Health check passed\nINFO: Memory usage 10%\nINFO: CPU usage 5%\nINFO: Network stable\nWARN: High latency detected\nCRITICAL ERROR: Flux Capacitor Overheat - Core meltdown imminent.\nINFO: System shutdown initiated\nINFO: Goodbye"
+}

@@ -1,5 +1,8 @@
 const API_BASE = 'http://localhost:8081';
 let currentMode = 'chat';
+let mediaRecorder = null;
+let audioChunks = [];
+let isRecording = false;
 
 // Fetch and display system status
 async function updateSystemStatus() {
@@ -112,12 +115,23 @@ document.getElementById('clearBtn').addEventListener('click', () => {
 function createMessage(content, type) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `message message-${type}`;
-    
+
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
     contentDiv.textContent = content;
-    
+
     msgDiv.appendChild(contentDiv);
+
+    // Add speaker button for agent messages
+    if (type === 'agent') {
+        const speakerBtn = document.createElement('button');
+        speakerBtn.className = 'speaker-btn';
+        speakerBtn.textContent = '🔊';
+        speakerBtn.title = 'Play as audio';
+        speakerBtn.onclick = () => speakText(content, msgDiv);
+        msgDiv.appendChild(speakerBtn);
+    }
+
     return msgDiv;
 }
 
@@ -208,6 +222,14 @@ function createAgentMessage(response, data) {
         }
     }
 
+    // Add speaker button for agent messages
+    const speakerBtn = document.createElement('button');
+    speakerBtn.className = 'speaker-btn';
+    speakerBtn.textContent = '🔊';
+    speakerBtn.title = 'Play as audio';
+    speakerBtn.onclick = () => speakText(response, msgDiv);
+    msgDiv.appendChild(speakerBtn);
+
     return msgDiv;
 }
 
@@ -276,6 +298,123 @@ async function sendMessage() {
     sendBtn.textContent = 'Send';
     chatContainer.scrollTop = chatContainer.scrollHeight;
     userInput.focus();
+}
+
+// Voice recording functionality
+const voiceBtn = document.getElementById('voiceBtn');
+
+voiceBtn.addEventListener('click', async () => {
+    if (!isRecording) {
+        // Start recording
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                await transcribeAudio(audioBlob);
+
+                // Stop all tracks
+                stream.getTracks().forEach(track => track.stop());
+            };
+
+            mediaRecorder.start();
+            isRecording = true;
+            voiceBtn.textContent = '⏹️';
+            voiceBtn.title = 'Stop recording';
+            voiceBtn.style.background = '#ef4444';
+        } catch (error) {
+            console.error('Error accessing microphone:', error);
+            alert('Could not access microphone. Please grant permission and try again.');
+        }
+    } else {
+        // Stop recording
+        mediaRecorder.stop();
+        isRecording = false;
+        voiceBtn.textContent = '🎤';
+        voiceBtn.title = 'Record voice input';
+        voiceBtn.style.background = '';
+    }
+});
+
+async function transcribeAudio(audioBlob) {
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Transcribing...';
+
+    try {
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.wav');
+
+        const response = await fetch(`${API_BASE}/voice/transcribe`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            userInput.value = data.text;
+            // Automatically send the transcribed text
+            sendMessage();
+        } else {
+            const error = await response.json();
+            chatContainer.appendChild(createMessage(`Voice transcription failed: ${error.detail}`, 'system'));
+        }
+    } catch (error) {
+        console.error('Transcription error:', error);
+        chatContainer.appendChild(createMessage(`Voice transcription error: ${error.message}`, 'system'));
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+    }
+}
+
+async function speakText(text, messageElement) {
+    try {
+        // Add a loading indicator
+        const speakerBtn = messageElement.querySelector('.speaker-btn');
+        if (speakerBtn) {
+            speakerBtn.textContent = '⏳';
+            speakerBtn.disabled = true;
+        }
+
+        const response = await fetch(`${API_BASE}/voice/synthesize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text })
+        });
+
+        if (response.ok) {
+            const audioBlob = await response.blob();
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+
+            audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                if (speakerBtn) {
+                    speakerBtn.textContent = '🔊';
+                    speakerBtn.disabled = false;
+                }
+            };
+
+            audio.play();
+        } else {
+            const error = await response.json();
+            console.error('TTS error:', error);
+            alert(`Voice synthesis failed: ${error.detail}`);
+            if (speakerBtn) {
+                speakerBtn.textContent = '🔊';
+                speakerBtn.disabled = false;
+            }
+        }
+    } catch (error) {
+        console.error('TTS error:', error);
+        alert(`Voice synthesis error: ${error.message}`);
+    }
 }
 
 userInput.focus();

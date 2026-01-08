@@ -12,12 +12,16 @@ Features:
 
 import json
 import os
+import base64
+import logging
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import redis
 
 from config import config
+
+logger = logging.getLogger(__name__)
 
 
 class ColdStorageManager:
@@ -59,13 +63,13 @@ class ColdStorageManager:
         cutoff_timestamp = int((datetime.now() - timedelta(days=days_threshold)).timestamp())
 
         # Get all memory keys (exclude index keys)
-        all_keys = self.redis_client.keys(f"{config.REDIS_MEMORY_PREFIX}*")
-        # Keys are bytes, decode them and filter
-        memory_keys = [
-            k for k in all_keys
-            if not (k.decode('utf-8') if isinstance(k, bytes) else k).endswith("_index")
-            and b":" in k
-        ]
+        # Use scan_iter() instead of keys() for non-blocking iteration
+        memory_keys = []
+        for key in self.redis_client.scan_iter(match=f"{config.REDIS_MEMORY_PREFIX}*", count=100):
+            # Decode and filter
+            key_str = key.decode('utf-8') if isinstance(key, bytes) else key
+            if not key_str.endswith("_index") and ":" in key_str:
+                memory_keys.append(key)
 
         if not memory_keys:
             return {
@@ -76,13 +80,18 @@ class ColdStorageManager:
             }
 
         # Load all memories with timestamps
+        # NOTE: There's a race condition window between keys() and hgetall()
+        # where keys could be deleted or new ones added. We handle this by:
+        # 1. Skipping keys that no longer exist (empty hgetall)
+        # 2. Re-validating key count before archival decisions
         memories_with_time = []
         for key in memory_keys:
             memory_data_raw = self.redis_client.hgetall(key)
             if not memory_data_raw:
+                # Key was deleted between keys() and hgetall(), skip it
                 continue
 
-            # Decode bytes to strings, skip binary fields (like embeddings)
+            # Decode bytes to strings, preserve binary fields (like embeddings) as base64
             memory_data = {}
             for k, v in memory_data_raw.items():
                 key_str = k.decode('utf-8') if isinstance(k, bytes) else k
@@ -90,8 +99,15 @@ class ColdStorageManager:
                     val_str = v.decode('utf-8') if isinstance(v, bytes) else v
                     memory_data[key_str] = val_str
                 except UnicodeDecodeError:
-                    # Skip binary fields (like embeddings)
-                    pass
+                    # Binary field (like embedding) - encode as base64 for JSON storage
+                    if isinstance(v, bytes):
+                        memory_data[key_str] = {
+                            "_binary": True,
+                            "data": base64.b64encode(v).decode('utf-8')
+                        }
+                    else:
+                        # Skip non-bytes binary data
+                        pass
 
             if "timestamp" in memory_data:
                 # Handle both int and float timestamps
@@ -105,10 +121,21 @@ class ColdStorageManager:
         # Sort by timestamp (oldest first)
         memories_with_time.sort(key=lambda x: x["timestamp"])
 
+        # Re-check count after loading (race condition mitigation)
+        # Some keys might have been deleted/added since initial scan
+        total_memories = len(memories_with_time)
+
+        if total_memories == 0:
+            return {
+                "archived": 0,
+                "kept_in_redis": 0,
+                "files_created": 0,
+                "error": None
+            }
+
         # Determine which to archive
         # Keep most recent 'keep_recent' memories regardless of age
         # Archive anything older than cutoff_timestamp that's not in recent set
-        total_memories = len(memories_with_time)
         recent_cutoff_index = max(0, total_memories - keep_recent)
 
         to_archive = []
@@ -139,19 +166,32 @@ class ColdStorageManager:
                 # Add memory to archive
                 archived_memories.append(mem["data"])
 
-                # Write back to file
-                with open(archive_path, 'w') as f:
+                # Write to temporary file first (atomic operation)
+                temp_path = archive_path.with_suffix('.tmp')
+                with open(temp_path, 'w') as f:
                     json.dump(archived_memories, f, indent=2)
 
-                # Remove from Redis
-                self.redis_client.delete(mem["key"])
+                # Verify temp file was written successfully
+                if not temp_path.exists() or temp_path.stat().st_size == 0:
+                    raise IOError(f"Failed to write archive file: {archive_path}")
+
+                # Atomic rename (overwrites existing file safely)
+                temp_path.replace(archive_path)
+
+                # Only NOW safe to delete from Redis (after successful write+verify)
+                # Check if key still exists before deleting (race condition mitigation)
+                if self.redis_client.exists(mem["key"]):
+                    self.redis_client.delete(mem["key"])
+                else:
+                    # Key was already deleted by another process, log warning
+                    logger.warning("Key %s already deleted before archival", mem['key'])
 
                 archived_count += 1
                 files_created.add(str(archive_path))
 
             except Exception as e:
                 # Log error but continue with other memories
-                print(f"Error archiving memory {mem['key']}: {e}")
+                logger.error("Error archiving memory %s: %s", mem['key'], e)
 
         return {
             "archived": archived_count,
@@ -182,6 +222,15 @@ class ColdStorageManager:
 
             for archive_file in sorted(month_dir.glob("memories-*.json"), reverse=True):
                 try:
+                    # Check file size to prevent memory exhaustion
+                    file_size = archive_file.stat().st_size
+                    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB limit
+
+                    if file_size > MAX_FILE_SIZE:
+                        logger.warning("Skipping large archive file %s (%.1fMB)",
+                                     archive_file.name, file_size / 1024 / 1024)
+                        continue
+
                     with open(archive_file, 'r') as f:
                         memories = json.load(f)
 
@@ -195,7 +244,7 @@ class ColdStorageManager:
                                 return results
 
                 except Exception as e:
-                    print(f"Error reading archive {archive_file}: {e}")
+                    logger.error("Error reading archive %s: %s", archive_file, e)
 
         return results
 
@@ -234,7 +283,7 @@ class ColdStorageManager:
                                     newest_date = timestamp
 
                 except Exception as e:
-                    print(f"Error reading archive {archive_file}: {e}")
+                    logger.error("Error reading archive %s: %s", archive_file, e)
 
         return {
             "total_archive_files": total_files,
@@ -277,12 +326,21 @@ class ColdStorageManager:
                             memory_id = memory.get("id", f"restored_{timestamp}")
                             key = f"{config.REDIS_MEMORY_PREFIX}{memory_id}"
 
+                            # Decode binary fields (embeddings) from base64
+                            restored_memory = {}
+                            for field_key, field_value in memory.items():
+                                if isinstance(field_value, dict) and field_value.get("_binary"):
+                                    # Decode base64 back to bytes
+                                    restored_memory[field_key] = base64.b64decode(field_value["data"])
+                                else:
+                                    restored_memory[field_key] = field_value
+
                             # Store in Redis
-                            self.redis_client.hset(key, mapping=memory)
+                            self.redis_client.hset(key, mapping=restored_memory)
                             restored_count += 1
 
                 except Exception as e:
-                    print(f"Error restoring from {archive_file}: {e}")
+                    logger.error("Error restoring from %s: %s", archive_file, e)
 
         return {
             "restored": restored_count,

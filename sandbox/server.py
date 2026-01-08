@@ -10,6 +10,15 @@ import contextlib
 import httpx
 from typing import Dict, Any
 
+# Pre-import safe standard library modules for sandbox
+import math
+import hashlib
+import random
+import datetime
+import json
+import re
+import string
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
@@ -79,7 +88,7 @@ async def execute_code(request: CodeRequest) -> CodeResponse:
                 return f"LLM Error: {str(e)}"
 
         # Create limited globals/locals for execution
-        # Only allow safe built-ins
+        # Only allow safe built-ins and pre-imported safe stdlib modules
         safe_globals = {
             "__builtins__": {
                 "print": print,
@@ -107,9 +116,17 @@ async def execute_code(request: CodeRequest) -> CodeResponse:
                 "all": all,
                 "type": type,
                 "help": help,
-                "__import__": __import__,
+                # "__import__": __import__,  # REMOVED: Security vulnerability - allows arbitrary imports
                 "ask_llm": ask_llm,  # RLM capability
-            }
+            },
+            # Safe standard library modules (pre-imported)
+            "math": math,
+            "hashlib": hashlib,
+            "random": random,
+            "datetime": datetime,
+            "json": json,
+            "re": re,
+            "string": string,
         }
 
         # Use same namespace for globals and locals to support recursion

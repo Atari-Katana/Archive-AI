@@ -1,6 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 void main() {
   runApp(const BasicChatApp());
@@ -35,6 +39,12 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isLoading = false;
+
+  // Voice functionality
+  final AudioRecorder _audioRecorder = AudioRecorder();
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool _isRecording = false;
+  String? _recordingPath;
 
   // Configuration
   static const String _apiBaseUrl = 'http://localhost:8081';
@@ -115,6 +125,140 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollToBottom();
   }
 
+  Future<void> _toggleRecording() async {
+    if (_isRecording) {
+      // Stop recording
+      final path = await _audioRecorder.stop();
+      if (path != null) {
+        setState(() {
+          _recordingPath = path;
+          _isRecording = false;
+        });
+        // Automatically transcribe
+        await _transcribeAudio(path);
+      }
+    } else {
+      // Start recording
+      if (await _audioRecorder.hasPermission()) {
+        final tempDir = await getTemporaryDirectory();
+        final filePath = '${tempDir.path}/recording_${DateTime.now().millisecondsSinceEpoch}.m4a';
+
+        await _audioRecorder.start(
+          const RecordConfig(encoder: AudioEncoder.aacLc),
+          path: filePath,
+        );
+
+        setState(() {
+          _isRecording = true;
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Microphone permission denied')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _transcribeAudio(String audioPath) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$_apiBaseUrl/voice/transcribe'),
+      );
+
+      request.files.add(await http.MultipartFile.fromPath('audio', audioPath));
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final transcribedText = data['text'] ?? '';
+
+        if (transcribedText.isNotEmpty) {
+          _textController.text = transcribedText;
+          // Automatically send the transcribed text
+          await _handleSubmitted(transcribedText);
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Transcription failed: ${response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Transcription error: $e')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Clean up recording file
+      try {
+        await File(audioPath).delete();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _speakText(String text) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$_apiBaseUrl/voice/synthesize'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'text': text}),
+      );
+
+      if (response.statusCode == 200) {
+        // Save audio to temp file
+        final tempDir = await getTemporaryDirectory();
+        final audioFile = File('${tempDir.path}/speech_${DateTime.now().millisecondsSinceEpoch}.wav');
+        await audioFile.writeAsBytes(response.bodyBytes);
+
+        // Play audio
+        await _audioPlayer.play(DeviceFileSource(audioFile.path));
+
+        // Clean up after playback
+        _audioPlayer.onPlayerComplete.listen((_) async {
+          try {
+            await audioFile.delete();
+          } catch (_) {}
+        });
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Speech synthesis failed: ${response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Speech synthesis error: $e')),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioRecorder.dispose();
+    _audioPlayer.dispose();
+    _textController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -178,13 +322,26 @@ class _ChatScreenState extends State<ChatScreen> {
                         if (!isUser && !isSystem)
                           Padding(
                             padding: const EdgeInsets.only(bottom: 4.0),
-                            child: Text(
-                              sender!,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: textColor.withOpacity(0.7),
-                              ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  sender!,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: textColor.withOpacity(0.7),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.volume_up, size: 16),
+                                  onPressed: () => _speakText(text),
+                                  color: Colors.blue,
+                                  tooltip: 'Play as audio',
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                ),
+                              ],
                             ),
                           ),
                         Text(
@@ -223,9 +380,18 @@ class _ChatScreenState extends State<ChatScreen> {
               controller: _textController,
               onSubmitted: _isLoading ? null : _handleSubmitted,
               decoration: const InputDecoration.collapsed(
-                hintText: 'Type a message...', 
+                hintText: 'Type a message...',
               ),
               enabled: !_isLoading,
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: IconButton(
+              icon: Icon(_isRecording ? Icons.stop : Icons.mic),
+              onPressed: _isLoading ? null : _toggleRecording,
+              color: _isRecording ? Colors.red : Colors.green,
+              tooltip: _isRecording ? 'Stop recording' : 'Record voice',
             ),
           ),
           Container(

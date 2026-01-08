@@ -95,7 +95,12 @@ start_services() {
 
     log_info "Spinning up containers (Redis, Vorpal, Goblin, Brain, etc.)..."
     log_info "Configuration: Dual-Engine (AWQ + 7B)"
-    
+
+    # Fix Docker Compose cache issues (ContainerConfig error)
+    log_info "Cleaning up any stale container metadata..."
+    docker-compose $COMPOSE_FILES down --remove-orphans 2>/dev/null || true
+    docker ps -a --filter "name=archive-ai" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
+
     if docker-compose $COMPOSE_FILES up -d; then
         log_success "Docker services started successfully."
     else

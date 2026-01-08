@@ -30,12 +30,21 @@ class Config:
 
     # Feature flags
     ASYNC_MEMORY = os.getenv("ASYNC_MEMORY", "true").lower() == "true"
-    ENABLE_VOICE = os.getenv("ENABLE_VOICE", "false").lower() == "true"
+    ENABLE_VOICE = os.getenv("ENABLE_VOICE", "true").lower() == "true"
 
     # Brain settings
     DEFAULT_ENGINE = "vorpal"
     REQUEST_TIMEOUT = 60  # Increased timeout for longer responses
     MAX_TOKENS = int(os.getenv("MAX_TOKENS", "1024"))
+
+    # HTTP Client timeouts (seconds)
+    HEALTH_CHECK_TIMEOUT = float(os.getenv("HEALTH_CHECK_TIMEOUT", "2.0"))
+    METRICS_TIMEOUT = float(os.getenv("METRICS_TIMEOUT", "2.0"))
+    SANDBOX_TIMEOUT = float(os.getenv("SANDBOX_TIMEOUT", "10.0"))
+    VERIFICATION_TIMEOUT = float(os.getenv("VERIFICATION_TIMEOUT", "30.0"))
+    RESEARCH_TIMEOUT = float(os.getenv("RESEARCH_TIMEOUT", "30.0"))
+    AGENT_TIMEOUT = float(os.getenv("AGENT_TIMEOUT", "60.0"))
+    ERROR_HANDLER_TIMEOUT = float(os.getenv("ERROR_HANDLER_TIMEOUT", "5.0"))
 
     # Model names
     VORPAL_MODEL = os.getenv("VORPAL_MODEL", "Qwen/Qwen2.5-3B-Instruct")

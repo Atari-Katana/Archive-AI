@@ -26,11 +26,11 @@ echo
 # Check if services are running
 echo "🔍 Checking if Archive-AI services are running..."
 
-if ! curl -s http://localhost:8080/health > /dev/null 2>&1; then
-    echo -e "${YELLOW}✗ Archive-AI not running at http://localhost:8080${NC}"
+if ! curl -s http://localhost:8081/health > /dev/null 2>&1; then
+    echo -e "${YELLOW}✗ Archive-AI not running at http://localhost:8081${NC}"
     echo
     echo "Start services first:"
-    echo "  bash go.sh"
+    echo "  ./start"
     echo
     exit 1
 fi
@@ -42,7 +42,7 @@ echo
 echo "🚀 Starting edge case tests..."
 echo
 
-python3 "$TEST_SCRIPT" --url "http://localhost:8080" --timeout 10.0
+python3 "$TEST_SCRIPT" --url "http://localhost:8081" --timeout 10.0
 
 echo
 echo -e "${BLUE}=================================================${NC}"

@@ -33,7 +33,7 @@ class EdgeCaseTestSuite:
     - Graceful degradation
     """
 
-    def __init__(self, base_url: str = "http://localhost:8080", timeout: float = 10.0):
+    def __init__(self, base_url: str = "http://localhost:8081", timeout: float = 10.0):
         """
         Initialize edge case test suite.
 

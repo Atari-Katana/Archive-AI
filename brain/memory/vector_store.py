@@ -5,12 +5,15 @@ Uses RedisVL for vector storage and sentence-transformers for embeddings.
 
 import time
 import json
+import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 import redis
 from sentence_transformers import SentenceTransformer
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStore:
@@ -32,9 +35,9 @@ class VectorStore:
         )
 
         # Load sentence-transformers model (CPU)
-        print("[VectorStore] Loading sentence-transformers model...")
+        logger.info("Loading sentence-transformers model...")
         self.model = SentenceTransformer('all-MiniLM-L6-v2')
-        print("[VectorStore] Model loaded")
+        logger.info("Model loaded")
 
     def create_index(self):
         """
@@ -45,7 +48,7 @@ class VectorStore:
             # Check if index exists
             try:
                 self.client.ft(self.index_name).info()
-                print(f"[VectorStore] Index '{self.index_name}' already exists")
+                logger.info("Index '%s' already exists", self.index_name)
                 return
             except redis.exceptions.ResponseError:
                 # Index doesn't exist, create it
@@ -72,16 +75,49 @@ class VectorStore:
                 "metadata", "TEXT"
             )
 
-            print(f"[VectorStore] Created index '{self.index_name}'")
+            logger.info("Created index '%s'", self.index_name)
 
         except Exception as e:
-            print(f"[VectorStore] Error creating index: {e}")
+            logger.error("Error creating index: %s", e)
             raise
 
     def close(self):
         """Close Redis connection"""
         if self.client:
             self.client.close()
+
+    def ensure_connected(self):
+        """
+        Ensure Redis connection is active.
+
+        Raises:
+            RuntimeError: If not connected or connection is lost
+        """
+        if not self.client:
+            raise RuntimeError("Vector store not connected. Call connect() first.")
+        try:
+            self.client.ping()
+        except Exception as e:
+            raise RuntimeError(f"Redis connection lost: {e}")
+
+    def _escape_tag_value(self, value: str) -> str:
+        r"""
+        Escape special characters for Redis FT.SEARCH TAG queries.
+
+        Redis FT.SEARCH requires escaping these characters in TAG values:
+        , . < > { } [ ] " ' : ; ! @ # $ % ^ & * ( ) - + = ~ / \ |
+
+        Args:
+            value: The tag value to escape
+
+        Returns:
+            Escaped tag value safe for FT.SEARCH queries
+        """
+        special_chars = r',.<>{}[]"\':;!@#$%^&*()-+=~\/|'
+        escaped = value
+        for char in special_chars:
+            escaped = escaped.replace(char, f"\\{char}")
+        return escaped
 
     def generate_embedding(self, text: str) -> np.ndarray:
         """
@@ -141,7 +177,7 @@ class VectorStore:
         # Store in Redis
         self.client.hset(memory_key, mapping=memory_data)
 
-        print(f"[VectorStore] Stored memory: {memory_key}")
+        logger.debug("Stored memory: %s", memory_key)
         return memory_key
 
     def search_similar(
@@ -167,8 +203,9 @@ class VectorStore:
 
         # Build KNN query
         if session_id:
-            # Escape special characters in tag value
-            escaped_session = session_id.replace("_", "\\_")
+            # Escape special characters in tag value for Redis FT.SEARCH
+            # Special chars: , . < > { } [ ] " ' : ; ! @ # $ % ^ & * ( ) - + = ~ / \ |
+            escaped_session = self._escape_tag_value(session_id)
             base_query = f"(@session_id:{{{escaped_session}}})=>[KNN {top_k} @embedding $vec AS score]"
         else:
             base_query = f"*=>[KNN {top_k} @embedding $vec AS score]"
@@ -186,7 +223,7 @@ class VectorStore:
                 "LIMIT", "0", str(top_k)
             )
         except Exception as e:
-            print(f"[VectorStore] Search error: {e}")
+            logger.error("Search error: %s", e)
             return []
 
         # Parse results

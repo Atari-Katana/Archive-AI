@@ -38,7 +38,8 @@ class ChainOfVerification:
     async def __aenter__(self):
         """Async context manager entry"""
         if self.own_client:
-            self.http_client = httpx.AsyncClient(timeout=30.0)
+            from config import config
+            self.http_client = httpx.AsyncClient(timeout=config.VERIFICATION_TIMEOUT)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

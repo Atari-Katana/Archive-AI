@@ -229,16 +229,74 @@ async def synthesize(text: str = Form(...)) -> FileResponse:
         # Synthesize speech with F5-TTS
         logger.info(f"[Voice] Synthesizing: '{text[:50]}...'")
 
-        # Generate speech (F5-TTS returns audio tensor)
-        audio_tensor, sample_rate = f5_tts_model.infer(
-            gen_text=text,
-            # Using default voice (can add ref_audio/ref_text for voice cloning)
-        )
+        # F5-TTS requires reference audio for voice cloning
+        # Create a simple silence audio as default reference
+        import numpy as np
+        default_ref_text = "Hello, this is a default voice."
+        sample_rate_ref = 24000
+
+        # Create a short silence audio (0.5 seconds) as default reference
+        silence_duration = 0.5
+        silence_samples = int(silence_duration * sample_rate_ref)
+        silence_audio = torch.zeros((1, silence_samples), dtype=torch.float32)
+
+        # Save silence to temporary reference file
+        ref_audio_path = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as ref_tmp:
+                ref_audio_path = ref_tmp.name
+
+            torchaudio.save(
+                ref_audio_path,
+                silence_audio,
+                sample_rate_ref,
+                format="wav"
+            )
+
+            # Generate speech (F5-TTS returns audio tensor)
+            # Note: F5-TTS infer() may return different number of values depending on version
+            result = f5_tts_model.infer(
+                gen_text=text,
+                ref_file=ref_audio_path,
+                ref_text=default_ref_text
+            )
+
+            # Handle different return formats
+            if isinstance(result, tuple):
+                if len(result) == 2:
+                    audio_tensor, sample_rate = result
+                elif len(result) == 3:
+                    audio_tensor, sample_rate, _ = result
+                else:
+                    audio_tensor = result[0]
+                    sample_rate = result[1] if len(result) > 1 else 24000
+            else:
+                audio_tensor = result
+                sample_rate = 24000
+        finally:
+            # Clean up reference file
+            if ref_audio_path and os.path.exists(ref_audio_path):
+                try:
+                    os.unlink(ref_audio_path)
+                except Exception:
+                    pass
 
         # Save to WAV file
+        # Convert to torch tensor if it's a numpy array
+        if isinstance(audio_tensor, np.ndarray):
+            audio_tensor = torch.from_numpy(audio_tensor)
+
+        # Ensure it's on CPU and has the right shape
+        if audio_tensor.device.type != 'cpu':
+            audio_tensor = audio_tensor.cpu()
+
+        # Ensure 2D tensor (channels, samples)
+        if audio_tensor.dim() == 1:
+            audio_tensor = audio_tensor.unsqueeze(0)
+
         torchaudio.save(
             output_path,
-            audio_tensor.cpu(),
+            audio_tensor,
             sample_rate,
             format="wav"
         )
@@ -323,9 +381,21 @@ async def synthesize_with_reference(
         )
 
         # Save to WAV file
+        # Convert to torch tensor if it's a numpy array
+        if isinstance(audio_tensor, np.ndarray):
+            audio_tensor = torch.from_numpy(audio_tensor)
+
+        # Ensure it's on CPU and has the right shape
+        if audio_tensor.device.type != 'cpu':
+            audio_tensor = audio_tensor.cpu()
+
+        # Ensure 2D tensor (channels, samples)
+        if audio_tensor.dim() == 1:
+            audio_tensor = audio_tensor.unsqueeze(0)
+
         torchaudio.save(
             output_path,
-            audio_tensor.cpu(),
+            audio_tensor,
             sample_rate,
             format="wav"
         )
