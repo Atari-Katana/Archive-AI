@@ -117,6 +117,30 @@ start_services() {
     else
         log_warn "Brain API is starting up (health check pending)..."
     fi
+
+    # Wait for Vorpal Engine to be ready
+    log_info "Waiting for Vorpal Engine to load model (this may take a minute)..."
+    local retries=30
+    local wait_time=2
+    local ready=false
+
+    for ((i=1; i<=retries; i++)); do
+        # Check metrics for Vorpal status
+        if status=$(curl -s http://localhost:8081/metrics | python3 -c "import sys, json; data=json.load(sys.stdin); print(next((s['status'] for s in data['services'] if s['name'] == 'Vorpal'), 'unknown'))" 2>/dev/null); then
+            if [ "$status" == "healthy" ]; then
+                log_success "Vorpal Engine is READY!"
+                ready=true
+                break
+            fi
+        fi
+        echo -ne "."
+        sleep $wait_time
+    done
+    echo ""
+
+    if [ "$ready" = false ]; then
+        log_warn "Vorpal Engine is still initializing (status: $status). It will be available shortly."
+    fi
 }
 
 stop_services() {

@@ -91,12 +91,14 @@ class _ChatScreenState extends State<ChatScreen> {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final agentResponse = data['response'] ?? 'No response received.';
+        final engine = data['engine'];
 
         if (mounted) {
           setState(() {
             _messages.add({
               'sender': 'Agent',
               'text': agentResponse,
+              'engine': engine ?? 'unknown',
             });
             _isLoading = false;
           });
@@ -278,6 +280,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 final message = _messages[index];
                 final sender = message['sender'];
                 final text = message['text']!;
+                final engine = message['engine'];
                 
                 final isUser = sender == 'User';
                 final isSystem = sender == 'System';
@@ -334,13 +337,29 @@ class _ChatScreenState extends State<ChatScreen> {
                                     color: textColor.withOpacity(0.7),
                                   ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.volume_up, size: 16),
-                                  onPressed: () => _speakText(text),
-                                  color: Colors.blue,
-                                  tooltip: 'Play as audio',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
+                                Row(
+                                  children: [
+                                    if (engine != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 8.0),
+                                        child: Text(
+                                          '⚙️ ${engine.split(':').last}',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontFamily: 'monospace',
+                                            color: textColor.withOpacity(0.6),
+                                          ),
+                                        ),
+                                      ),
+                                    IconButton(
+                                      icon: const Icon(Icons.volume_up, size: 16),
+                                      onPressed: () => _speakText(text),
+                                      color: Colors.blue,
+                                      tooltip: 'Play as audio',
+                                      padding: EdgeInsets.zero,
+                                      constraints: const BoxConstraints(),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
