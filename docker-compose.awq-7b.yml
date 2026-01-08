@@ -26,7 +26,7 @@ services:
   goblin:
     image: ghcr.io/ggml-org/llama.cpp:server-cuda
     environment:
-      - MODEL_PATH=${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf}
+      - MODEL_PATH=${GOBLIN_MODEL_PATH:-/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf}
       - N_GPU_LAYERS=${GOBLIN_N_GPU_LAYERS:-38}
     deploy:
       resources:
@@ -37,7 +37,7 @@ services:
               capabilities: [gpu]
     command:
       - "--model"
-      - "${GOBLIN_MODEL_PATH:-/models/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf}"
+      - "${GOBLIN_MODEL_PATH:-/models/qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf}"
       - "--host"
       - "0.0.0.0"
       - "--port"
