@@ -236,6 +236,7 @@ class VerifyResponse(BaseModel):
     verification_qa: List[VerificationQA]
     final_response: str
     revised: bool
+    engine: str = "vorpal"
 
 
 class AgentRequest(BaseModel):
@@ -259,6 +260,7 @@ class AgentResponse(BaseModel):
     steps: List[AgentStepResponse]
     total_steps: int
     success: bool
+    engine: str = "vorpal"
     error: Optional[str] = None
 
 
@@ -347,6 +349,7 @@ class ResearchResponse(BaseModel):
     memories_consulted: int
     total_sources: int
     success: bool
+    engine: str = "vorpal"
     error: Optional[str] = None
 
 
@@ -371,6 +374,7 @@ class CodeAssistResponse(BaseModel):
     test_output: Optional[str] = None
     success: bool
     attempts: int
+    engine: str = "vorpal"
     error: Optional[str] = None
 
 
@@ -879,7 +883,8 @@ async def verify(request: VerifyRequest, http_request: Request) -> VerifyRespons
             verification_questions=result["verification_questions"],
             verification_qa=verification_qa,
             final_response=result["final_response"],
-            revised=result["revised"]
+            revised=result["revised"],
+            engine=f"vorpal/{config.VORPAL_MODEL}"
         )
 
     except httpx.HTTPError as e:
@@ -979,6 +984,7 @@ async def agent_solve(request: AgentRequest) -> AgentResponse:
             steps=steps_response,
             total_steps=result.total_steps,
             success=result.success,
+            engine=f"vorpal/{config.VORPAL_MODEL}",
             error=result.error
         )
 
@@ -1089,6 +1095,7 @@ async def agent_solve_advanced(request: AgentRequest) -> AgentResponse:
             steps=steps_response,
             total_steps=result.total_steps,
             success=result.success,
+            engine=f"vorpal/{config.VORPAL_MODEL}",
             error=result.error
         )
 
@@ -1162,6 +1169,7 @@ async def run_recursive_agent(request: RecursiveAgentRequest) -> AgentResponse:
             steps=formatted_steps,
             total_steps=result.total_steps,
             success=result.success,
+            engine=f"vorpal/{config.VORPAL_MODEL}",
             error=result.error
         )
 
@@ -1685,6 +1693,7 @@ async def research_question(request: ResearchRequest) -> ResearchResponse:
             memories_consulted=result.memories_consulted,
             total_sources=result.total_sources,
             success=result.success,
+            engine=f"vorpal/{config.VORPAL_MODEL}",
             error=result.error
         )
 
@@ -1800,6 +1809,7 @@ async def assist_with_code(request: CodeAssistRequest) -> CodeAssistResponse:
             test_output=result.test_output,
             success=result.success,
             attempts=result.attempts,
+            engine=f"vorpal/{config.VORPAL_MODEL}",
             error=result.error
         )
 
