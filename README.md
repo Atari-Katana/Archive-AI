@@ -12,8 +12,8 @@ Archive-AI is a self-hosted AI companion with permanent memory, dual inference e
 - **Permanent Memory** - Titans-inspired "Surprise Score" for intelligent memory retention
 - **Dual Inference Engines** - Vorpal (speed) + Goblin (capacity) optimized for 16GB GPU
 - **Voice I/O** - Faster-Whisper STT + F5-TTS with natural voice synthesis
-- **Agentic Workflows** - Research and code assistants with tool use
-- **Library Ingestion** - PDF/TXT/MD document processing with semantic search
+- **🧠 Cognitive Architecture** - OctoTools-based agents with tool use & chain-of-thought
+- **📚 Library System** - RAG ingestion for PDFs/Text with vector search
 - **Cold Storage** - Automatic memory archival to disk with tiered storage
 - **Chain of Verification** - Hallucination mitigation for trusted outputs
 

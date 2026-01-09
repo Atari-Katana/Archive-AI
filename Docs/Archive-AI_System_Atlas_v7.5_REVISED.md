@@ -1,6 +1,6 @@
 # Archive-AI: Unified System Atlas (v7.5 - REVISED)
 
-**Architecture:** Hybrid Inference / Titans Memory / Redis-Native / LangGraph
+**Architecture:** Hybrid Inference / Titans Memory / Redis-Native / OctoTools
 **Status:** **Final Production Specification**
 **Date:** December 2025
 **Hardware Target:** Single NVIDIA RTX 5060 Ti (16GB VRAM) + 64GB System RAM
@@ -14,7 +14,7 @@ Archive-AI is a local-first cognitive framework designed for permanent memory re
 **The v7.5 "Production" Architecture:**
 We have optimized the system for stability on a single GPU:
 1.  **One Database:** **Redis Stack** handles everything (Streams, Vectors, Library).
-2.  **One Logic Graph:** **ReAct Agents** handle Reasoning and Tool Use.
+2.  **One Logic Graph:** **OctoTools** handles Reasoning and Tool Use.
 3.  **Async Memory:** "Surprise Scoring" happens in the background to ensure zero latency.
 4.  **Safety First:** Strict VRAM caps and a dedicated Docker Sandbox for code execution.
 
@@ -110,7 +110,7 @@ We implement a "Microservice Sandbox" to ensure the container actually listens f
 
 ---
 
-## VI. Orchestration (Unified ReAct)
+## VI. Orchestration (Unified OctoTools)
 
 ### 1. Semantic Router (RedisVL)
 * **Mechanism:** Intent patterns stored as vector embeddings in Redis vector index.
@@ -123,12 +123,12 @@ We implement a "Microservice Sandbox" to ensure the container actually listens f
     * Initial routes: Hand-crafted intent patterns (e.g., "memory query", "code execution", "library search").
     * Future: Routes can be expanded/refined based on usage patterns.
 
-### 2. Agent Planning System (ReAct)
+### 2. Agent Planning System (OctoTools)
 * **Architecture:** Multi-step reasoning with tool execution
 * **Planning Loop:**
     1. **Task Decomposition:** DeepSeek-R1-Distill breaks complex queries into subtasks
     2. **Tool Selection:** Router identifies required tools (code execution, library search, web search, memory queries)
-    3. **Execution:** ReAct agent orchestrates sequential or parallel tool calls
+    3. **Execution:** OctoTools executor orchestrates sequential or parallel tool calls
     4. **Observation:** Results fed back to reasoning model
     5. **Iteration:** Agent continues until task complete or max iterations (default: 10)
 
@@ -353,7 +353,7 @@ networks:
 
 ### Phase 2: Logic Layer + Voice (Week 2)
 1. **Implement Archive-Brain Core**
-   - Set up ReAct agent with basic chat flow.
+   - Set up OctoTools agent with basic chat flow.
    - Connect to Vorpal for chat responses.
    - Implement Goblin model swapping logic.
 
@@ -388,7 +388,7 @@ networks:
    - Verify Redis memory cap holds.
 
 2. **Agent Planning System**
-   - Implement ReAct loop.
+   - Implement OctoTools planner loop.
    - Connect all tools (code execution, library search, memory, web).
    - Test multi-step reasoning tasks:
      * "Analyze this dataset and create a visualization"
