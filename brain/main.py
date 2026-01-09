@@ -29,6 +29,7 @@ from agents import ReActAgent, ToolRegistry, AgentStep, get_basic_tools, get_adv
 from memory.vector_store import vector_store
 from metrics_collector import router as metrics_router, collector
 from config_api import router as config_router
+from personas import router as personas_router, manager as personas_manager
 
 
 # Simple in-memory rate limiter
@@ -131,6 +132,7 @@ app.add_middleware(
 # Include feature routers
 app.include_router(metrics_router)
 app.include_router(config_router)
+app.include_router(personas_router)
 
 # Mount static files for UI panels at /ui path to avoid route conflicts
 ui_path = Path(__file__).parent / "ui"
@@ -755,14 +757,24 @@ async def chat(request: ChatRequest, http_request: Request) -> ChatResponse:
 
     logger.info(f"Routing message to Bifrost (Model: {bifrost_model})")
 
+    # Get active persona prompt
+    active_persona = personas_manager.get_active_persona()
+    messages = []
+    
+    if active_persona:
+        system_content = active_persona.personality
+        if active_persona.history:
+            system_content += f"\n\nContext/History: {active_persona.history}"
+        messages.append({"role": "system", "content": system_content})
+    
+    messages.append({"role": "user", "content": request.message})
+
     try:
         # Proxy request to Bifrost (OpenAI-compatible API)
         async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
             bifrost_payload = {
                 "model": bifrost_model,
-                "messages": [
-                    {"role": "user", "content": request.message}
-                ],
+                "messages": messages,
                 "max_tokens": config.MAX_TOKENS,
                 "temperature": 0.7
             }
@@ -790,7 +802,7 @@ async def chat(request: ChatRequest, http_request: Request) -> ChatResponse:
             async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
                 vorpal_payload = {
                     "model": config.VORPAL_MODEL,
-                    "messages": [{"role": "user", "content": request.message}],
+                    "messages": messages,
                     "max_tokens": config.MAX_TOKENS,
                     "temperature": 0.7
                 }
@@ -1973,6 +1985,7 @@ async def synthesize_speech(request: VoiceSynthesisRequest):
     Synthesize speech from text using F5-TTS (Chunk 5.3).
 
     Send text and receive a WAV audio file.
+    If an active persona has a voice sample, it will be used for voice cloning.
 
     Args:
         request: Text to synthesize
@@ -1990,13 +2003,35 @@ async def synthesize_speech(request: VoiceSynthesisRequest):
         raise HTTPException(status_code=400, detail="Text cannot be empty")
 
     try:
+        # Check active persona for voice sample
+        active_persona = personas_manager.get_active_persona()
+        files = None
+        endpoint = "/synthesize"
+        
+        if active_persona and active_persona.voice_sample_path:
+            # Construct file path (ui/assets/personas/...)
+            full_path = os.path.join("ui", active_persona.voice_sample_path)
+            if os.path.exists(full_path):
+                # Read file
+                # Note: We read into memory, be careful with large files
+                with open(full_path, "rb") as f:
+                    file_content = f.read()
+                    files = {"reference_audio": (os.path.basename(full_path), file_content, "audio/wav")}
+                endpoint = "/synthesize_with_reference"
+
         # Forward to voice service
         async with httpx.AsyncClient(timeout=60.0) as client:
-            # Send as form data
-            response = await client.post(
-                f"{config.VOICE_URL}/synthesize",
-                data={"text": request.text}
-            )
+            if files:
+                response = await client.post(
+                    f"{config.VOICE_URL}{endpoint}",
+                    data={"text": request.text},
+                    files=files
+                )
+            else:
+                response = await client.post(
+                    f"{config.VOICE_URL}/synthesize",
+                    data={"text": request.text}
+                )
 
             if response.status_code != 200:
                 raise HTTPException(

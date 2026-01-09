@@ -14,7 +14,22 @@
     <div class="container">
         <div class="main-panel">
             <div class="header">
-                <h1>Archive-AI</h1>
+                <div class="header-top">
+                    <h1>Archive-AI</h1>
+                    <div class="persona-dropdown">
+                        <button class="persona-btn" id="personaDropdownBtn">
+                            <span id="currentPersonaName">Select Persona</span>
+                            <span class="dropdown-arrow">▼</span>
+                        </button>
+                        <div class="dropdown-content" id="personaDropdownList">
+                            <button class="dropdown-item studio-btn" id="openStudioBtn">✨ Persona Studio</button>
+                            <div class="dropdown-separator"></div>
+                            <div id="personaListItems">
+                                <!-- Items injected by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <p>Intelligent Agent with Reasoning & Tool Use</p>
             </div>
 
@@ -101,6 +116,44 @@
                 <button class="action-btn" id="calcBtn">Quick Calculation</button>
                 <button class="action-btn" id="clearBtn">Clear Chat</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Persona Studio Modal -->
+    <div id="personaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Persona Studio</h2>
+                <span class="close-modal" id="closeModalBtn">&times;</span>
+            </div>
+            <form id="personaForm">
+                <input type="hidden" id="personaId">
+                <div class="form-group">
+                    <label for="personaName">Name *</label>
+                    <input type="text" id="personaName" required placeholder="e.g., Archibald Thornwick">
+                </div>
+                <div class="form-group">
+                    <label for="personaPersonality">Personality (System Prompt) *</label>
+                    <textarea id="personaPersonality" rows="6" required placeholder="You are a Victorian Illustrator..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="personaHistory">History / Backstory</label>
+                    <textarea id="personaHistory" rows="3" placeholder="Born in London, 1860..."></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group half-width">
+                        <label for="personaAvatar">Portrait (Image)</label>
+                        <input type="file" id="personaAvatar" accept="image/*">
+                        <div id="avatarPreview" class="file-preview"></div>
+                    </div>
+                    <div class="form-group half-width">
+                        <label for="personaVoice">Voice Sample (Audio)</label>
+                        <input type="file" id="personaVoice" accept="audio/*">
+                        <div id="voicePreview" class="file-preview"></div>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="savePersonaBtn">Create Persona</button>
+            </form>
         </div>
     </div>
 

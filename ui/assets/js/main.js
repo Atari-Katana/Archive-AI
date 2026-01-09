@@ -495,3 +495,268 @@ async function speakText(text, messageElement) {
 }
 
 userInput.focus();
+
+/* ==========================================
+   Persona Management Logic
+   ========================================== */
+
+const personaDropdownBtn = document.getElementById('personaDropdownBtn');
+const personaDropdownList = document.getElementById('personaDropdownList');
+const openStudioBtn = document.getElementById('openStudioBtn');
+const personaModal = document.getElementById('personaModal');
+const closeModalBtn = document.getElementById('closeModalBtn');
+const personaForm = document.getElementById('personaForm');
+const personaListItems = document.getElementById('personaListItems');
+const currentPersonaName = document.getElementById('currentPersonaName');
+
+// Dropdown Toggle
+if (personaDropdownBtn) {
+    personaDropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelector('.persona-dropdown').classList.toggle('active');
+    });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (document.querySelector('.persona-dropdown') && !e.target.closest('.persona-dropdown')) {
+        document.querySelector('.persona-dropdown').classList.remove('active');
+    }
+});
+
+// Modal Controls
+if (openStudioBtn) {
+    openStudioBtn.addEventListener('click', () => {
+        openPersonaModal();
+        document.querySelector('.persona-dropdown').classList.remove('active');
+    });
+}
+
+if (closeModalBtn) {
+    closeModalBtn.addEventListener('click', () => {
+        personaModal.style.display = 'none';
+    });
+}
+
+window.addEventListener('click', (e) => {
+    if (e.target === personaModal) {
+        personaModal.style.display = 'none';
+    }
+});
+
+// Load Personas on startup
+async function loadPersonas() {
+    try {
+        const [listResp, activeResp] = await Promise.all([
+            fetch(`${API_BASE}/personas`),
+            fetch(`${API_BASE}/personas/active`)
+        ]);
+        
+        const personas = await listResp.json();
+        const activeData = await activeResp.json();
+        const activeId = activeData.active_persona_id;
+        
+        renderPersonaList(personas, activeId);
+        
+        if (activeData.persona) {
+            currentPersonaName.textContent = activeData.persona.name;
+        } else {
+            currentPersonaName.textContent = "Select Persona";
+        }
+        
+    } catch (error) {
+        console.error("Failed to load personas:", error);
+    }
+}
+
+function renderPersonaList(personas, activeId) {
+    if (!personaListItems) return;
+    personaListItems.innerHTML = '';
+    
+    if (personas.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'dropdown-item';
+        empty.style.color = '#999';
+        empty.style.fontStyle = 'italic';
+        empty.textContent = 'No personas created';
+        personaListItems.appendChild(empty);
+        return;
+    }
+    
+    personas.forEach(persona => {
+        const item = document.createElement('div');
+        item.className = 'persona-item';
+        
+        const isActive = persona.id === activeId;
+        
+        // Use onclick attributes for simplicity in this context
+        item.innerHTML = `
+            <div class="persona-name-container" onclick="activatePersona('${persona.id}')">
+                <span class="persona-name">${persona.name}</span>
+                ${isActive ? '<span class="active-check">✓</span>' : ''}
+            </div>
+            <div class="persona-controls">
+                <span class="control-icon" title="Edit" onclick="editPersona('${persona.id}')">✏️</span>
+                <span class="control-icon" title="Delete" onclick="deletePersona('${persona.id}', '${persona.name}')">🗑️</span>
+            </div>
+        `;
+        
+        personaListItems.appendChild(item);
+    });
+}
+
+window.activatePersona = async (id) => {
+    try {
+        await fetch(`${API_BASE}/personas/activate/${id}`, { method: 'POST' });
+        loadPersonas(); // Refresh UI
+        document.querySelector('.persona-dropdown').classList.remove('active');
+        
+        // Add system message
+        const resp = await fetch(`${API_BASE}/personas/active`);
+        const data = await resp.json();
+        if (data.persona) {
+            chatContainer.appendChild(createMessage(`**System**: Activated persona **${data.persona.name}**`, 'system'));
+        }
+    } catch (error) {
+        console.error("Failed to activate persona:", error);
+    }
+}
+
+function openPersonaModal(persona = null) {
+    const title = document.getElementById('modalTitle');
+    const btn = document.getElementById('savePersonaBtn');
+    
+    // Clear form
+    if (personaForm) personaForm.reset();
+    document.getElementById('personaId').value = '';
+    document.getElementById('avatarPreview').innerHTML = '';
+    document.getElementById('voicePreview').innerHTML = '';
+    
+    if (persona) {
+        // Edit Mode
+        title.textContent = 'Edit Persona';
+        btn.textContent = 'Update Persona';
+        
+        document.getElementById('personaId').value = persona.id;
+        document.getElementById('personaName').value = persona.name;
+        document.getElementById('personaPersonality').value = persona.personality;
+        document.getElementById('personaHistory').value = persona.history || '';
+        
+        if (persona.avatar_path) {
+            document.getElementById('avatarPreview').innerHTML = 
+                `<img src="${API_BASE}/ui/${persona.avatar_path}" alt="Avatar">`;
+        }
+    } else {
+        // Create Mode
+        title.textContent = 'Persona Studio';
+        btn.textContent = 'Create Persona';
+    }
+    
+    personaModal.style.display = 'block';
+}
+
+// Edit Trigger
+window.editPersona = async (id) => {
+    const listResp = await fetch(`${API_BASE}/personas`);
+    const personas = await listResp.json();
+    const persona = personas.find(p => p.id === id);
+    if (persona) {
+        openPersonaModal(persona);
+        document.querySelector('.persona-dropdown').classList.remove('active');
+    }
+};
+
+// Delete Trigger
+window.deletePersona = async (id, name) => {
+    if (confirm(`Are you sure you want to delete ${name}?`)) {
+        try {
+            await fetch(`${API_BASE}/personas/${id}`, { method: 'DELETE' });
+            loadPersonas();
+        } catch (error) {
+            alert("Failed to delete persona");
+        }
+    }
+};
+
+// Form Submission
+if (personaForm) {
+    personaForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const btn = document.getElementById('savePersonaBtn');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        
+        const id = document.getElementById('personaId').value;
+        const name = document.getElementById('personaName').value;
+        const personality = document.getElementById('personaPersonality').value;
+        const history = document.getElementById('personaHistory').value;
+        const avatarFile = document.getElementById('personaAvatar').files[0];
+        const voiceFile = document.getElementById('personaVoice').files[0];
+        
+        // Upload assets first if present
+        let avatarPath = null;
+        let voicePath = null;
+        
+        try {
+            if (avatarFile) {
+                const formData = new FormData();
+                formData.append('file', avatarFile);
+                formData.append('type', 'image');
+                const resp = await fetch(`${API_BASE}/personas/upload`, { method: 'POST', body: formData });
+                if (resp.ok) {
+                    avatarPath = (await resp.json()).path;
+                }
+            }
+            
+            if (voiceFile) {
+                const formData = new FormData();
+                formData.append('file', voiceFile);
+                formData.append('type', 'audio');
+                const resp = await fetch(`${API_BASE}/personas/upload`, { method: 'POST', body: formData });
+                if (resp.ok) {
+                    voicePath = (await resp.json()).path;
+                }
+            }
+            
+            const payload = {
+                name,
+                personality,
+                history
+            };
+            
+            if (avatarPath) payload.avatar_path = avatarPath;
+            if (voicePath) payload.voice_sample_path = voicePath;
+            
+            if (id) {
+                // Update
+                await fetch(`${API_BASE}/personas/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                // Create
+                await fetch(`${API_BASE}/personas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+            }
+            
+            personaModal.style.display = 'none';
+            loadPersonas();
+            
+        } catch (error) {
+            console.error("Error saving persona:", error);
+            alert("Error saving persona: " + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    });
+}
+
+// Initialize
+loadPersonas();

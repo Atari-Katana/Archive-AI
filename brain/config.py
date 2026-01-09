@@ -60,5 +60,10 @@ class Config:
     ARCHIVE_MINUTE = int(os.getenv("ARCHIVE_MINUTE", "0"))  # Run at :00
     ARCHIVE_ENABLED = os.getenv("ARCHIVE_ENABLED", "true").lower() == "true"
 
+    # Personas
+    PERSONAS_FILE = os.path.join("data", "personas.json")
+    PERSONAS_ASSET_DIR = os.path.join("ui", "assets", "personas")
+    DEFAULT_SYSTEM_PROMPT = "You are a helpful AI assistant."
+
 
 config = Config()
