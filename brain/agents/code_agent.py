@@ -1,13 +1,6 @@
 """
 Code Assistant Agent (Chunk 5.5)
 Specialized agent for code generation, testing, and debugging.
-
-Capabilities:
-- Generate Python code from natural language
-- Automatically test generated code
-- Debug and fix errors (max 3 attempts)
-- Support Python, bash scripts, SQL queries
-- Return working code with explanations
 """
 
 import httpx
@@ -15,6 +8,7 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 from config import config
+from brain.services.llm import llm
 
 
 @dataclass
@@ -95,51 +89,41 @@ async def generate_code(task: str, previous_error: Optional[str] = None) -> Dict
         user_prompt = f"Task: {task}\n\nGenerate Python code:"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                f"{config.VORPAL_URL}/v1/chat/completions",
-                json={
-                    "model": config.VORPAL_MODEL,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    "max_tokens": 1000,
-                    "temperature": 0.2  # Low temperature for code generation
-                }
-            )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ]
+        
+        result = await llm.chat(
+            messages=messages,
+            max_tokens=1000,
+            temperature=0.2
+        )
+        
+        full_response = result["content"]
 
-            if response.status_code != 200:
-                return {
-                    "code": "",
-                    "explanation": f"LLM request failed (HTTP {response.status_code})"
-                }
+        # Try to extract code and explanation
+        # Look for code blocks (```python ... ```)
+        if "```python" in full_response:
+            parts = full_response.split("```python")
+            if len(parts) > 1:
+                code_part = parts[1].split("```")[0].strip()
+                # Everything after the code block is explanation
+                explanation = full_response.split("```")[-1].strip()
+                if not explanation:
+                    explanation = "Code generated successfully"
+                return {"code": code_part, "explanation": explanation}
 
-            llm_response = response.json()
-            full_response = llm_response["choices"][0]["message"]["content"].strip()
+        # If no code blocks, try to split by common patterns
+        if "\n\nExplanation:" in full_response:
+            code, explanation = full_response.split("\n\nExplanation:", 1)
+            return {"code": code.strip(), "explanation": explanation.strip()}
 
-            # Try to extract code and explanation
-            # Look for code blocks (```python ... ```)
-            if "```python" in full_response:
-                parts = full_response.split("```python")
-                if len(parts) > 1:
-                    code_part = parts[1].split("```")[0].strip()
-                    # Everything after the code block is explanation
-                    explanation = full_response.split("```")[-1].strip()
-                    if not explanation:
-                        explanation = "Code generated successfully"
-                    return {"code": code_part, "explanation": explanation}
-
-            # If no code blocks, try to split by common patterns
-            if "\n\nExplanation:" in full_response:
-                code, explanation = full_response.split("\n\nExplanation:", 1)
-                return {"code": code.strip(), "explanation": explanation.strip()}
-
-            # Fallback: treat everything as code
-            return {
-                "code": full_response,
-                "explanation": "Code generated (no explicit explanation provided)"
-            }
+        # Fallback: treat everything as code
+        return {
+            "code": full_response,
+            "explanation": "Code generated (no explicit explanation provided)"
+        }
 
     except Exception as e:
         return {
@@ -222,7 +206,7 @@ async def code_assist(
     return CodeResult(
         task=task,
         code="",
-        explanation="Max attempts reached",
+        explanation=gen_result["explanation"], # Fixed ref
         test_output=None,
         success=False,
         attempts=max_attempts,

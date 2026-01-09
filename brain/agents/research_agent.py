@@ -1,12 +1,6 @@
 """
 Research Assistant Agent (Chunk 5.4)
 Specialized agent for research tasks using library + memory search.
-
-Capabilities:
-- Search ingested library documents
-- Search conversation memories
-- Combine multiple sources
-- Provide cited, researched answers
 """
 
 import httpx
@@ -14,6 +8,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from config import config
+from brain.services.llm import llm
+from brain.tools.library_search import get_library_search_tool
 
 
 @dataclass
@@ -50,19 +46,9 @@ async def library_search_tool(query: str, top_k: int = 5) -> str:
         if len(query) > 500:
             return f"Error: Query too long ({len(query)} chars). Maximum 500 characters."
 
-        # Call library search API
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                "http://localhost:8080/library/search",
-                json={"query": query, "top_k": min(top_k, 10)}
-            )
-
-            if response.status_code != 200:
-                return f"Error: Library search failed (HTTP {response.status_code})"
-
-            data = response.json()
-
-        chunks = data.get("chunks", [])
+        # Use direct tool instead of HTTP loopback
+        tool = get_library_search_tool()
+        chunks = tool.search(query, top_k=min(top_k, 10))
 
         if not chunks:
             return "No relevant library documents found."
@@ -111,24 +97,17 @@ async def research_query(
         # Search library if enabled
         if use_library:
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.post(
-                        f"{config.BRAIN_URL}/library/search",
-                        json={"query": question, "top_k": top_k}
-                    )
+                tool = get_library_search_tool()
+                chunks = tool.search(question, top_k=top_k)
+                library_chunks = len(chunks)
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        chunks = data.get("chunks", [])
-                        library_chunks = len(chunks)
-
-                        for chunk in chunks:
-                            sources.append({
-                                "type": "library",
-                                "filename": chunk.get("filename"),
-                                "text": chunk.get("text"),
-                                "similarity": chunk.get("similarity_pct", 0)
-                            })
+                for chunk in chunks:
+                    sources.append({
+                        "type": "library",
+                        "filename": chunk.get("filename"),
+                        "text": chunk.get("text"),
+                        "similarity": chunk.get("similarity_pct", 0)
+                    })
             except Exception as e:
                 # Library search failed, continue without it
                 pass
@@ -136,24 +115,25 @@ async def research_query(
         # Search memories if enabled
         if use_memory:
             try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.get(
-                        f"{config.BRAIN_URL}/memory/search",
-                        params={"query": question, "top_k": top_k}
-                    )
+                # Use internal memory search if available or keep HTTP for now if memory logic is complex
+                # For consistency with library search optimization, we should use vector_store directly
+                # assuming it's initialized
+                from brain.memory.vector_store import vector_store
+                
+                # Ensure connected
+                if not vector_store.client:
+                    vector_store.connect()
+                    
+                memory_results = vector_store.search_similar(question, top_k=top_k)
+                memories = len(memory_results)
 
-                    if response.status_code == 200:
-                        data = response.json()
-                        memory_results = data.get("memories", [])
-                        memories = len(memory_results)
-
-                        for mem in memory_results:
-                            sources.append({
-                                "type": "memory",
-                                "message": mem.get("message"),
-                                "timestamp": mem.get("timestamp"),
-                                "similarity": (1.0 - mem.get("similarity_score", 1.0)) * 100
-                            })
+                for mem in memory_results:
+                    sources.append({
+                        "type": "memory",
+                        "message": mem.get("message"),
+                        "timestamp": mem.get("timestamp"),
+                        "similarity": (1.0 - mem.get("similarity_score", 1.0)) * 100
+                    })
             except Exception as e:
                 # Memory search failed, continue without it
                 pass
@@ -161,43 +141,28 @@ async def research_query(
         # Generate answer using Vorpal with context from sources
         context = _format_sources_for_llm(sources)
 
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{config.VORPAL_URL}/v1/chat/completions",
-                json={
-                    "model": config.VORPAL_MODEL,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": (
-                                "You are a research assistant. Answer the question using ONLY the provided sources. "
-                                "Cite sources using [Source N] notation. If sources don't contain relevant information, "
-                                "say so clearly. Be concise and factual."
-                            )
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Question: {question}\n\nSources:\n{context}\n\nProvide a researched answer with citations:"
-                        }
-                    ],
-                    "max_tokens": 500,
-                    "temperature": 0.3  # Lower temperature for factual responses
-                }
-            )
-
-            if response.status_code != 200:
-                return ResearchResult(
-                    answer="",
-                    sources=sources,
-                    memories_consulted=memories,
-                    library_chunks_consulted=library_chunks,
-                    total_sources=len(sources),
-                    success=False,
-                    error=f"LLM request failed (HTTP {response.status_code})"
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "You are a research assistant. Answer the question using ONLY the provided sources. "
+                    "Cite sources using [Source N] notation. If sources don't contain relevant information, "
+                    "say so clearly. Be concise and factual."
                 )
+            },
+            {
+                "role": "user",
+                "content": f"Question: {question}\n\nSources:\n{context}\n\nProvide a researched answer with citations:"
+            }
+        ]
 
-            llm_response = response.json()
-            answer = llm_response["choices"][0]["message"]["content"].strip()
+        result = await llm.chat(
+            messages=messages,
+            max_tokens=500,
+            temperature=0.3
+        )
+        
+        answer = result["content"]
 
         return ResearchResult(
             answer=answer,
@@ -279,31 +244,23 @@ async def multi_query_research(
 
     # Generate synthesis
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{config.VORPAL_URL}/v1/chat/completions",
-                json={
-                    "model": config.VORPAL_MODEL,
-                    "messages": [
-                        {
-                            "role": "system",
-                            "content": "You are a research synthesizer. Combine the findings into a coherent summary."
-                        },
-                        {
-                            "role": "user",
-                            "content": synthesis_prompt
-                        }
-                    ],
-                    "max_tokens": 800,
-                    "temperature": 0.4
-                }
-            )
-
-            if response.status_code == 200:
-                llm_response = response.json()
-                synthesis = llm_response["choices"][0]["message"]["content"].strip()
-            else:
-                synthesis = "(Synthesis failed)"
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a research synthesizer. Combine the findings into a coherent summary."
+            },
+            {
+                "role": "user",
+                "content": synthesis_prompt
+            }
+        ]
+        
+        result = await llm.chat(
+            messages=messages,
+            max_tokens=800,
+            temperature=0.4
+        )
+        synthesis = result["content"]
 
     except Exception:
         synthesis = "(Synthesis error)"

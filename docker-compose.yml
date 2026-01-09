@@ -108,6 +108,7 @@ services:
       - "${BRAIN_PORT:-8081}:8080"
     volumes:
       - ./ui:/app/ui  # Mount UI files for static serving
+      - ./data:/app/data # Mount data directory for persistence
     networks:
       - archive-net
     deploy:

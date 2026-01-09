@@ -14,7 +14,7 @@ Archive-AI is a local-first cognitive framework designed for permanent memory re
 **The v7.5 "Production" Architecture:**
 We have optimized the system for stability on a single GPU:
 1.  **One Database:** **Redis Stack** handles everything (Streams, Vectors, Library).
-2.  **One Logic Graph:** **LangGraph** handles Reasoning and Tool Use.
+2.  **One Logic Graph:** **ReAct Agents** handle Reasoning and Tool Use.
 3.  **Async Memory:** "Surprise Scoring" happens in the background to ensure zero latency.
 4.  **Safety First:** Strict VRAM caps and a dedicated Docker Sandbox for code execution.
 
@@ -110,7 +110,7 @@ We implement a "Microservice Sandbox" to ensure the container actually listens f
 
 ---
 
-## VI. Orchestration (Unified LangGraph)
+## VI. Orchestration (Unified ReAct)
 
 ### 1. Semantic Router (RedisVL)
 * **Mechanism:** Intent patterns stored as vector embeddings in Redis vector index.
@@ -123,12 +123,12 @@ We implement a "Microservice Sandbox" to ensure the container actually listens f
     * Initial routes: Hand-crafted intent patterns (e.g., "memory query", "code execution", "library search").
     * Future: Routes can be expanded/refined based on usage patterns.
 
-### 2. Agent Planning System (ReAct + LangGraph)
+### 2. Agent Planning System (ReAct)
 * **Architecture:** Multi-step reasoning with tool execution
 * **Planning Loop:**
     1. **Task Decomposition:** DeepSeek-R1-Distill breaks complex queries into subtasks
     2. **Tool Selection:** Router identifies required tools (code execution, library search, web search, memory queries)
-    3. **Execution:** LangGraph orchestrates sequential or parallel tool calls
+    3. **Execution:** ReAct agent orchestrates sequential or parallel tool calls
     4. **Observation:** Results fed back to reasoning model
     5. **Iteration:** Agent continues until task complete or max iterations (default: 10)
 
@@ -145,7 +145,7 @@ We implement a "Microservice Sandbox" to ensure the container actually listens f
     * Sandbox isolation for code execution
     * Human-in-the-loop for destructive operations (file deletion, external API calls)
 
-### 3. Chain of Verification (CoV Graph)
+### 3. Chain of Verification (CoV)
 1.  **Draft:** DeepSeek-R1-Distill (Goblin) generates answer with chain-of-thought.
 2.  **Critique:** Llama-3-8B (Vorpal) extracts factual claims from draft.
 3.  **Verify:** Tool Node searches Redis Library/Web for supporting evidence.
@@ -353,7 +353,7 @@ networks:
 
 ### Phase 2: Logic Layer + Voice (Week 2)
 1. **Implement Archive-Brain Core**
-   - Set up LangGraph with basic chat flow.
+   - Set up ReAct agent with basic chat flow.
    - Connect to Vorpal for chat responses.
    - Implement Goblin model swapping logic.
 
@@ -388,7 +388,7 @@ networks:
    - Verify Redis memory cap holds.
 
 2. **Agent Planning System**
-   - Implement ReAct loop in LangGraph.
+   - Implement ReAct loop.
    - Connect all tools (code execution, library search, memory, web).
    - Test multi-step reasoning tasks:
      * "Analyze this dataset and create a visualization"
@@ -397,7 +397,7 @@ networks:
    - Verify max iteration caps and timeouts work.
 
 3. **Chain of Verification**
-   - Implement CoV graph in LangGraph.
+   - Implement CoV logic.
    - Connect verification to Library search.
    - Test fact-checking on known false statements.
 

@@ -72,7 +72,14 @@ check_dependencies() {
         exit 1
     fi
 
-    if ! command -v python3 &> /dev/null; then
+    # Check for venv
+    if [ -f "$ROOT_DIR/venv/bin/python3" ]; then
+        PYTHON_CMD="$ROOT_DIR/venv/bin/python3"
+        log_info "Using virtual environment: $PYTHON_CMD"
+    elif command -v python3 &> /dev/null; then
+        PYTHON_CMD="python3"
+        log_warn "Virtual environment not found. Using system python3."
+    else
         log_error "Python3 is not installed."
         exit 1
     fi
@@ -90,7 +97,7 @@ start_services() {
     # Check for models
     if [ ! -f "$ROOT_DIR/models/goblin/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf" ]; then
         log_warn "Goblin model missing. Initiating auto-download..."
-        python3 "$ROOT_DIR/scripts/download-models.py" --model goblin-7b
+        $PYTHON_CMD "$ROOT_DIR/scripts/download-models.py" --model goblin-7b
     fi
 
     log_info "Spinning up containers (Redis, Vorpal, Goblin, Brain, etc.)..."
@@ -101,7 +108,7 @@ start_services() {
     docker-compose $COMPOSE_FILES down --remove-orphans 2>/dev/null || true
     docker ps -a --filter "name=archive-ai" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
 
-    if docker-compose $COMPOSE_FILES up -d; then
+    if docker-compose $COMPOSE_FILES up -d --build; then
         log_success "Docker services started successfully."
     else
         log_error "Failed to start Docker services."
@@ -126,7 +133,7 @@ start_services() {
 
     for ((i=1; i<=retries; i++)); do
         # Check metrics for Vorpal status
-        if status=$(curl -s http://localhost:8081/metrics | python3 -c "import sys, json; data=json.load(sys.stdin); print(next((s['status'] for s in data['services'] if s['name'] == 'Vorpal'), 'unknown'))" 2>/dev/null); then
+        if status=$(curl -s http://localhost:8081/metrics | $PYTHON_CMD -c "import sys, json; data=json.load(sys.stdin); print(next((s['status'] for s in data['services'] if s['name'] == 'Vorpal'), 'unknown'))" 2>/dev/null); then
             if [ "$status" == "healthy" ]; then
                 log_success "Vorpal Engine is READY!"
                 ready=true
@@ -172,7 +179,7 @@ start_web_ui() {
     log_info "Serving Web UI on port $WEB_UI_PORT..."
     
     # Start python server in background
-    python3 -m http.server $WEB_UI_PORT &
+    $PYTHON_CMD -m http.server $WEB_UI_PORT &
     UI_PID=$!
     
     log_success "Web UI is live at: http://localhost:$WEB_UI_PORT"

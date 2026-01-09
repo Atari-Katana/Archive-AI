@@ -6,15 +6,14 @@ Stores surprising memories in vector store.
 """
 
 import asyncio
-import httpx
 import redis.asyncio as redis_async
 from typing import Optional
 import math
-import traceback
 import logging
 
 from config import config
 from memory.vector_store import VectorStore
+from brain.services.llm import llm
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,6 @@ class MemoryWorker:
 
     def __init__(self):
         self.redis_client: Optional[redis_async.Redis] = None
-        self.http_client: Optional[httpx.AsyncClient] = None
         self.vector_store: Optional[VectorStore] = None
         self.running = False
         self.last_id: Optional[str] = None  # Populated during connect
@@ -51,10 +49,6 @@ class MemoryWorker:
         self.redis_client = await redis_async.from_url(
             config.REDIS_URL,
             decode_responses=True
-        )
-        # Give Vorpal plenty of time to load on cold start
-        self.http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(60.0, connect=10.0)
         )
 
         # Wait for Vorpal health before starting the worker loop
@@ -79,8 +73,10 @@ class MemoryWorker:
         self.running = False
         if self.redis_client:
             await self.redis_client.close()
-        if self.http_client:
-            await self.http_client.aclose()
+        
+        # Close global LLM client if needed (though it manages itself mostly)
+        await llm.close()
+
         if self.vector_store:
             await asyncio.get_event_loop().run_in_executor(
                 None,
@@ -106,43 +102,25 @@ class MemoryWorker:
 
     async def wait_for_vorpal_ready(self, timeout: int = 120) -> None:
         """Wait for Vorpal to be reachable before processing messages."""
-        if not self.http_client:
-            return
-
         deadline = asyncio.get_event_loop().time() + timeout
         attempt = 1
 
         while True:
-            try:
-                response = await self.http_client.get(
-                    f"{config.VORPAL_URL}/health",
-                    timeout=10.0
-                )
-                if response.status_code == 200:
-                    logger.info("Vorpal is ready")
-                    return
-
-                logger.warning(
-                    "Vorpal health check failed with status %s",
-                    response.status_code
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Vorpal health check attempt %s failed: %s",
-                    attempt,
-                    exc
-                )
+            if await llm.health_check():
+                logger.info("Vorpal is ready")
+                return
 
             if asyncio.get_event_loop().time() >= deadline:
                 logger.warning("Vorpal readiness check timed out; continuing anyway")
                 return
 
+            logger.warning(f"Vorpal health check attempt {attempt} failed")
             attempt += 1
             await asyncio.sleep(2.0)
 
     async def calculate_perplexity(self, text: str) -> Optional[float]:
         """
-        Calculate perplexity of text using Vorpal.
+        Calculate perplexity of text using Vorpal via LLMClient.
 
         Args:
             text: Input text to evaluate
@@ -150,61 +128,15 @@ class MemoryWorker:
         Returns:
             Perplexity score (lower = more predictable)
         """
-        # Request logprobs from Vorpal
-        payload = {
-            "model": config.VORPAL_MODEL,
-            "prompt": text,
-            "max_tokens": 1,  # We just need logprobs, not generation
-            "logprobs": 1,
-            "echo": True  # Return logprobs for input tokens
-        }
-
         for attempt in range(1, self.PERPLEXITY_RETRIES + 1):
-            try:
-                response = await self.http_client.post(
-                    f"{config.VORPAL_URL}/v1/completions",
-                    json=payload
-                )
-
-                if response.status_code != 200:
-                    logger.warning(
-                        "Vorpal error (attempt %s): %s",
-                        attempt,
-                        response.status_code
-                    )
-                    await asyncio.sleep(self.PERPLEXITY_RETRY_DELAY)
-                    continue
-
-                result = response.json()
-
-                # Extract logprobs from response
-                choices = result.get("choices", [])
-                if not choices:
-                    return None
-
-                logprobs_data = choices[0].get("logprobs", {})
-                token_logprobs = logprobs_data.get("token_logprobs", [])
-
-                if not token_logprobs:
-                    return None
-
-                # Calculate perplexity from average log probability
+            avg_logprob = await llm.get_logprobs(text)
+            
+            if avg_logprob is not None:
                 # Perplexity = exp(-average_log_prob)
-                valid_logprobs = [lp for lp in token_logprobs if lp is not None]
-                if not valid_logprobs:
-                    return None
-
-                avg_logprob = sum(valid_logprobs) / len(valid_logprobs)
-                perplexity = math.exp(-avg_logprob)
-
-                return perplexity
-
-            except Exception as e:
-                logger.exception(
-                    "Perplexity calculation error (attempt %s): %s",
-                    attempt,
-                    e
-                )
+                try:
+                    return math.exp(-avg_logprob)
+                except OverflowError:
+                    return float('inf')
 
             if attempt < self.PERPLEXITY_RETRIES:
                 await asyncio.sleep(self.PERPLEXITY_RETRY_DELAY)

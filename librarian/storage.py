@@ -283,6 +283,8 @@ class LibraryStorage:
             for key in self.redis_client.scan_iter(match="library:*", count=100):
                 filename = self.redis_client.hget(key, "filename")
                 if filename:
+                    if isinstance(filename, bytes):
+                        filename = filename.decode('utf-8')
                     filenames.add(filename)
 
             return {

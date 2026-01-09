@@ -9,9 +9,9 @@ Process:
 4. Revise response based on verification results
 """
 
-import httpx
 from typing import List, Dict, Optional
 from config import config
+from brain.services.llm import llm
 
 
 class ChainOfVerification:
@@ -25,31 +25,17 @@ class ChainOfVerification:
     - Revising responses when needed
     """
 
-    def __init__(self, http_client: Optional[httpx.AsyncClient] = None):
-        """
-        Initialize verification chain.
-
-        Args:
-            http_client: Optional existing httpx client (for connection reuse)
-        """
-        self.http_client = http_client
-        self.own_client = http_client is None
-
     async def __aenter__(self):
         """Async context manager entry"""
-        if self.own_client:
-            from config import config
-            self.http_client = httpx.AsyncClient(timeout=config.VERIFICATION_TIMEOUT)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
-        if self.own_client and self.http_client:
-            await self.http_client.aclose()
+        pass
 
     async def generate_response(self, prompt: str) -> str:
         """
-        Generate initial response from Vorpal.
+        Generate initial response from LLM.
 
         Args:
             prompt: User's question/prompt
@@ -57,21 +43,11 @@ class ChainOfVerification:
         Returns:
             Initial response text
         """
-        payload = {
-            "model": config.VORPAL_MODEL,
-            "prompt": prompt,
-            "max_tokens": config.MAX_TOKENS,
-            "temperature": 0.7
-        }
-
-        response = await self.http_client.post(
-            f"{config.VORPAL_URL}/v1/completions",
-            json=payload
+        result = await llm.completion(
+            prompt=prompt,
+            temperature=0.7
         )
-        response.raise_for_status()
-        result = response.json()
-
-        return result["choices"][0]["text"].strip()
+        return result["text"].strip()
 
     async def generate_verification_questions(
         self,
@@ -104,21 +80,13 @@ Generate verification questions that:
         Format: One question per line, numbered.
         Verification questions:"""
 
-        payload = {
-            "model": config.VORPAL_MODEL,
-            "prompt": verification_prompt,
-            "max_tokens": 150,
-            "temperature": 0.3  # Lower temp for more focused questions
-        }
-
-        response_obj = await self.http_client.post(
-            f"{config.VORPAL_URL}/v1/completions",
-            json=payload
+        result = await llm.completion(
+            prompt=verification_prompt,
+            max_tokens=150,
+            temperature=0.3
         )
-        response_obj.raise_for_status()
-        result = response_obj.json()
 
-        questions_text = result["choices"][0]["text"].strip()
+        questions_text = result["text"].strip()
 
         # Parse questions (simple line-based parsing)
         questions = []
@@ -143,21 +111,12 @@ Generate verification questions that:
         Returns:
             Answer to the verification question
         """
-        payload = {
-            "model": config.VORPAL_MODEL,
-            "prompt": question,
-            "max_tokens": 100,
-            "temperature": 0.3
-        }
-
-        response = await self.http_client.post(
-            f"{config.VORPAL_URL}/v1/completions",
-            json=payload
+        result = await llm.completion(
+            prompt=question,
+            max_tokens=100,
+            temperature=0.3
         )
-        response.raise_for_status()
-        result = response.json()
-
-        return result["choices"][0]["text"].strip()
+        return result["text"].strip()
 
     async def verify_and_revise(
         self,
@@ -192,21 +151,11 @@ Verification Results:
 
 Provide the final answer (corrected if needed):"""
 
-        payload = {
-            "model": config.VORPAL_MODEL,
-            "prompt": revision_prompt,
-            "max_tokens": config.MAX_TOKENS,
-            "temperature": 0.5
-        }
-
-        response_obj = await self.http_client.post(
-            f"{config.VORPAL_URL}/v1/completions",
-            json=payload
+        result = await llm.completion(
+            prompt=revision_prompt,
+            temperature=0.5
         )
-        response_obj.raise_for_status()
-        result = response_obj.json()
-
-        return result["choices"][0]["text"].strip()
+        return result["text"].strip()
 
     async def verify(
         self,

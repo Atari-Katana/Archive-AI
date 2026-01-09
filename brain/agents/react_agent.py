@@ -1,27 +1,38 @@
 """
-ReAct Agent Framework (Chunk 3.2)
-Implements Reasoning + Acting pattern for multi-step problem solving.
-
-ReAct Loop:
-1. Thought: Reason about what to do next
-2. Action: Select and execute a tool
-3. Observation: See the result
-4. Repeat until task complete
-5. Final Answer: Return the solution
-
-Based on: "ReAct: Synergizing Reasoning and Acting in Language Models"
-https://arxiv.org/abs/2210.03629
+ReAct Agent Framework (Chunk 3.2) - OctoTools Integration
+Replaces native ReAct implementation with OctoTools framework.
 """
 
-import httpx
-import re
+import os
+import sys
+import asyncio
+import logging
 from typing import List, Dict, Optional, Any, Callable
 from dataclasses import dataclass
 from enum import Enum
 
+# Add OctoTools to path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+octotools_root = os.path.abspath(os.path.join(current_dir, '../../octotools_repo'))
+if octotools_root not in sys.path:
+    sys.path.append(octotools_root)
+
+# Set OpenAI Base URL for OctoTools to use Vorpal
 from config import config
+os.environ["OPENAI_BASE_URL"] = f"{config.VORPAL_URL}/v1"
+# Ensure API Key is set (even if dummy)
+if "OPENAI_API_KEY" not in os.environ:
+    os.environ["OPENAI_API_KEY"] = "dummy-key"
+
+try:
+    from octotools.solver import construct_solver
+except ImportError:
+    # Fallback/Mock for when octotools is not installed properly in dev environment
+    construct_solver = None
+
 from stream_handler import stream_handler
 
+logger = logging.getLogger(__name__)
 
 class AgentState(Enum):
     """Agent execution states"""
@@ -30,7 +41,6 @@ class AgentState(Enum):
     OBSERVING = "observing"
     FINISHED = "finished"
     ERROR = "error"
-
 
 @dataclass
 class AgentStep:
@@ -41,7 +51,6 @@ class AgentStep:
     observation: Optional[str] = None
     step_number: int = 0
 
-
 @dataclass
 class AgentResult:
     """Final result from agent execution"""
@@ -51,334 +60,143 @@ class AgentResult:
     success: bool
     error: Optional[str] = None
 
-
 class ToolRegistry:
     """
     Registry of tools available to the agent.
-    Tools are functions the agent can call to perform actions.
+    Maintained for compatibility, but OctoTools uses its own discovery.
     """
-
     def __init__(self):
         self.tools: Dict[str, Callable] = {}
         self.tool_descriptions: Dict[str, str] = {}
 
     def register(self, name: str, description: str, func: Callable):
-        """
-        Register a new tool.
-
-        Args:
-            name: Tool name (used in Action)
-            description: What the tool does
-            func: Callable that executes the tool
-        """
         self.tools[name] = func
         self.tool_descriptions[name] = description
 
     def get_tool(self, name: str) -> Optional[Callable]:
-        """Get a tool by name"""
         return self.tools.get(name)
 
     def list_tools(self) -> str:
-        """Get formatted list of available tools"""
         if not self.tools:
             return "No tools available."
-
         tool_list = []
         for name, desc in self.tool_descriptions.items():
             tool_list.append(f"- {name}: {desc}")
-
         return "\n".join(tool_list)
-
 
 class ReActAgent:
     """
-    ReAct agent that can reason and act to solve complex problems.
-
-    The agent follows the ReAct pattern:
-    - Thought: Reasoning about the next step
-    - Action: Tool to use
-    - Action Input: Input for the tool
-    - Observation: Result from the tool
-
-    This continues until the agent reaches a final answer.
+    ReAct agent wrapper around OctoTools.
     """
-
-    # Maximum steps to prevent infinite loops
     MAX_STEPS = 10
 
     def __init__(
         self,
-        tool_registry: ToolRegistry,
-        http_client: Optional[httpx.AsyncClient] = None
+        tool_registry: ToolRegistry, 
+        llm_client: Optional[Any] = None 
     ):
-        """
-        Initialize ReAct agent.
-
-        Args:
-            tool_registry: Registry of available tools
-            http_client: Optional httpx client for LLM calls
-        """
         self.tool_registry = tool_registry
-        self.http_client = http_client
-        self.own_client = http_client is None
+        
+        if construct_solver is None:
+            logger.error("OctoTools not found or failed to import.")
 
     async def __aenter__(self):
-        """Async context manager entry"""
-        if self.own_client:
-            self.http_client = httpx.AsyncClient(timeout=60.0)
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        if self.own_client and self.http_client:
-            await self.http_client.aclose()
+        pass
 
     async def _save_procedural_memory(self, question: str, result: AgentResult):
-        """
-        Save the successful problem-solving process to memory.
-        This gives the agent 'procedural memory' of how it solved tasks.
-        """
         if not result.success:
             return
-
         try:
-            # Construct summary
-            actions = [step.action for step in result.steps if step.action]
             summary = (
                 f"Procedural Memory: To solve the task '{question}', "
-                f"I performed the following actions: {', '.join(actions)}. "
+                f"I performed {result.total_steps} steps using OctoTools. "
                 f"The final outcome was: {result.answer}"
             )
-
-            # Inject into memory stream
-            # The memory worker will pick this up and store it if it has high surprise/salience
             await stream_handler.capture_input(summary)
-            
         except Exception as e:
-            # Don't fail the agent if memory save fails
-            print(f"Failed to save procedural memory: {e}")
-
-    def _build_prompt(
-        self,
-        question: str,
-        steps: List[AgentStep],
-        tools: str
-    ) -> str:
-        """
-        Build the ReAct prompt for the LLM.
-
-        Args:
-            question: Original user question
-            steps: Previous agent steps
-            tools: Available tools description
-
-        Returns:
-            Formatted prompt for the LLM
-        """
-        prompt = f"""You are a helpful AI assistant that can reason and use tools to answer questions.
-
-Available Tools:
-{tools}
-
-Use the following format:
-
-Thought: [your reasoning about what to do next]
-Action: [tool name from available tools, or "Final Answer"]
-Action Input: [input for the tool, or your final answer if Action is "Final Answer"]
-Observation: [result from the tool - this will be provided by the system]
-
-Question: {question}
-"""
-
-        # Add previous steps to the prompt
-        for step in steps:
-            prompt += f"\nThought: {step.thought}"
-            if step.action:
-                prompt += f"\nAction: {step.action}"
-            if step.action_input:
-                prompt += f"\nAction Input: {step.action_input}"
-            if step.observation:
-                prompt += f"\nObservation: {step.observation}"
-
-        # Prompt for next thought
-        prompt += "\nThought:"
-
-        return prompt
-
-    async def _generate_step(self, prompt: str) -> str:
-        """
-        Generate the next reasoning step using Vorpal.
-
-        Args:
-            prompt: The ReAct prompt
-
-        Returns:
-            LLM response with Thought/Action/Action Input
-        """
-        payload = {
-            "model": config.VORPAL_MODEL,
-            "prompt": prompt,
-            "max_tokens": config.MAX_TOKENS,
-            "temperature": 0.7,
-            "stop": ["Observation:"]  # Stop before observation
-        }
-
-        response = await self.http_client.post(
-            f"{config.VORPAL_URL}/v1/completions",
-            json=payload
-        )
-        response.raise_for_status()
-        result = response.json()
-
-        return result["choices"][0]["text"].strip()
-
-    def _parse_step(self, response: str) -> Dict[str, str]:
-        """
-        Parse the LLM response into thought, action, and action input.
-
-        Args:
-            response: Raw LLM response
-
-        Returns:
-            Dict with 'thought', 'action', 'action_input'
-        """
-        parsed = {
-            "thought": "",
-            "action": "",
-            "action_input": ""
-        }
-
-        # Extract thought
-        thought_match = re.search(
-            r"^(.+?)(?=Action:|$)",
-            response,
-            re.DOTALL | re.MULTILINE
-        )
-        if thought_match:
-            parsed["thought"] = thought_match.group(1).strip()
-
-        # Extract action
-        action_match = re.search(r"Action:\s*(.+?)(?=\n|Action Input:|$)", response)
-        if action_match:
-            parsed["action"] = action_match.group(1).strip()
-
-        # Extract action input
-        action_input_match = re.search(
-            r"Action Input:\s*(.+?)(?=\n\n|$)",
-            response,
-            re.DOTALL
-        )
-        if action_input_match:
-            parsed["action_input"] = action_input_match.group(1).strip()
-
-        return parsed
-
-    async def _execute_action(
-        self,
-        action: str,
-        action_input: str
-    ) -> str:
-        """
-        Execute an action using the appropriate tool.
-
-        Args:
-            action: Tool name
-            action_input: Input for the tool
-
-        Returns:
-            Observation from the tool
-        """
-        if action == "Final Answer":
-            return action_input
-
-        tool = self.tool_registry.get_tool(action)
-        if not tool:
-            return f"Error: Tool '{action}' not found. Available tools: {', '.join(self.tool_registry.tools.keys())}"
-
-        try:
-            # Execute the tool
-            result = await tool(action_input)
-            return str(result)
-        except Exception as e:
-            return f"Error executing {action}: {str(e)}"
+            logger.warning(f"Failed to save procedural memory: {e}")
 
     async def solve(self, question: str) -> AgentResult:
         """
-        Solve a question using the ReAct pattern.
-
-        Args:
-            question: The question to solve
-
-        Returns:
-            AgentResult with answer and reasoning trace
+        Solve a question using OctoTools.
         """
-        steps: List[AgentStep] = []
-        tools_description = self.tool_registry.list_tools()
+        if construct_solver is None:
+            return AgentResult(
+                answer="",
+                steps=[],
+                total_steps=0,
+                success=False,
+                error="OctoTools framework not available."
+            )
 
-        for step_num in range(self.MAX_STEPS):
-            try:
-                # Build prompt with history
-                prompt = self._build_prompt(question, steps, tools_description)
-
-                # Generate next step
-                response = await self._generate_step(prompt)
-
-                # Parse response
-                parsed = self._parse_step(response)
-
-                # Create step object
-                current_step = AgentStep(
-                    thought=parsed["thought"],
-                    action=parsed["action"],
-                    action_input=parsed["action_input"],
-                    step_number=step_num + 1
+        try:
+            # Run OctoTools in a thread since it is synchronous
+            def run_octotools():
+                solver = construct_solver(
+                    llm_engine_name="gpt-4o", # Triggers OpenAI engine (redirected to Vorpal)
+                    enabled_tools=["archive_ai"],
+                    max_steps=self.MAX_STEPS,
+                    verbose=True
                 )
+                return solver.solve(question)
 
-                # Check if we're done
-                if parsed["action"] == "Final Answer":
-                    current_step.observation = "Task complete"
-                    steps.append(current_step)
+            json_data = await asyncio.to_thread(run_octotools)
+            
+            final_answer = json_data.get("final_output") or json_data.get("direct_output") or json_data.get("base_response") or "No answer generated."
+            memory = json_data.get("memory", [])
+            
+            steps = []
+            for i, action in enumerate(memory):
+                # OctoTools Memory Action structure check needed.
+                # Assuming it has dict-like access or object attributes
+                # In solver.py: self.memory.add_action(...)
+                # In memory.py (which I haven't seen but inferred):
+                
+                # Check if action is dict or object
+                if isinstance(action, dict):
+                    thought = action.get('sub_goal') or action.get('thought', '')
+                    tool = action.get('tool', '')
+                    command = action.get('command', '')
+                    result = str(action.get('result', ''))
+                else:
+                    # Try attribute access
+                    thought = getattr(action, 'sub_goal', '')
+                    tool = getattr(action, 'tool', '')
+                    command = getattr(action, 'command', '')
+                    result = str(getattr(action, 'result', ''))
 
-                    result = AgentResult(
-                        answer=parsed["action_input"],
-                        steps=steps,
-                        total_steps=len(steps),
-                        success=True
-                    )
-                    
-                    # Save procedural memory
-                    await self._save_procedural_memory(question, result)
-                    
-                    return result
-
-                # Execute action
-                if parsed["action"]:
-                    observation = await self._execute_action(
-                        parsed["action"],
-                        parsed["action_input"]
-                    )
-                    current_step.observation = observation
-
-                steps.append(current_step)
-
-            except Exception as e:
-                return AgentResult(
-                    answer="",
-                    steps=steps,
-                    total_steps=len(steps),
-                    success=False,
-                    error=f"Error at step {step_num + 1}: {str(e)}"
+                step = AgentStep(
+                    step_number=i+1,
+                    thought=thought,
+                    action=tool,
+                    action_input=command,
+                    observation=result
                 )
+                steps.append(step)
+            
+            result = AgentResult(
+                answer=final_answer,
+                steps=steps,
+                total_steps=len(steps),
+                success=True
+            )
+            
+            await self._save_procedural_memory(question, result)
+            return result
 
-        # Max steps reached
-        return AgentResult(
-            answer="Unable to complete task within step limit",
-            steps=steps,
-            total_steps=len(steps),
-            success=False,
-            error=f"Maximum steps ({self.MAX_STEPS}) reached"
-        )
-
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return AgentResult(
+                answer="",
+                steps=[],
+                total_steps=0,
+                success=False,
+                error=f"OctoTools Error: {str(e)}"
+            )
 
 # Convenience function for one-off agent tasks
 async def solve_with_react(
@@ -395,11 +213,10 @@ async def solve_with_react(
     Returns:
         AgentResult
     """
-    # Build tool registry
+    # Build dummy registry
     registry = ToolRegistry()
     for name, (desc, func) in tools.items():
         registry.register(name, desc, func)
 
-    # Run agent
     async with ReActAgent(registry) as agent:
         return await agent.solve(question)

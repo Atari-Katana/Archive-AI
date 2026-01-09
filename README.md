@@ -24,7 +24,6 @@ Archive-AI is a self-hosted AI companion with permanent memory, dual inference e
 - **⚙️ Web Configuration UI** - Live config editing with validation
 - **🧪 Comprehensive Testing** - Stress tests + edge case coverage
 - **📝 Professional Error Handling** - Actionable error messages with recovery steps
-- **🔄 LangGraph Integration** - Advanced workflow patterns
 - **🎯 Empirical Tuning** - Optimized surprise score weights
 
 ### Performance
@@ -584,7 +583,6 @@ curl http://localhost:8081/metrics/current | jq
 - ✅ **Metrics dashboard**
 - ✅ **Configuration UI**
 - ✅ **Comprehensive testing**
-- ✅ **LangGraph integration**
 - ✅ **Empirical tuning**
 
 ### Future Enhancements
@@ -603,7 +601,6 @@ curl http://localhost:8081/metrics/current | jq
 - **Redis Stack** - State + vector search
 - **Faster-Whisper** - Optimized speech recognition
 - **F5-TTS** - Neural text-to-speech
-- **LangGraph** - Agentic workflow framework
 - **Claude Code** - Development assistance
 
 ---
@@ -672,8 +669,7 @@ Built with Claude Code
 4. **⚙️ Config UI** - Web-based configuration editor
 5. **📝 Professional Errors** - Actionable messages with recovery steps
 6. **🧪 Test Suite** - 22 integration tests + stress tests
-7. **🔄 LangGraph** - Advanced workflow patterns
-8. **🎯 Empirical Tuning** - Optimized surprise scores
+7. **🎯 Empirical Tuning** - Optimized surprise scores
 
 ### Improvements
 - Fixed static file routing (now at /ui/)

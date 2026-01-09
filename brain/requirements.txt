@@ -22,5 +22,4 @@ psutil==6.1.1
 # Web Search
 duckduckgo-search>=6.1.0
 
-# Future: LangGraph, etc.
-# langgraph==0.2.0
+python-multipart
