@@ -39,16 +39,19 @@ Your goal is to answer the user's question by writing Python code to inspect `CO
 
 ### Example Workflow
 Question: "What is the main conclusion of the paper?"
-1. Thought: I check the length of the corpus.
-   Action: CodeExecution
-   Input: print(len(CORPUS))
-2. Thought: It's 50,000 chars. I'll read the last 2000 chars to find the conclusion.
-   Action: CodeExecution
-   Input: print(CORPUS[-2000:])
-3. Thought: I see the conclusion section. I will ask the LLM to summarize it.
-   Action: CodeExecution
-   Input: print(ask_llm(f"Summarize this conclusion: {CORPUS[-2000:]}"))
-4. Final Answer: The conclusion is...
+Thought: I check the length of the corpus.
+Action: CodeExecution
+Action Input: print(len(CORPUS))
+Observation: 50000
+Thought: It's 50,000 chars. I'll read the last 2000 chars to find the conclusion.
+Action: CodeExecution
+Action Input: print(CORPUS[-2000:])
+Observation: ... In conclusion, the results show...
+Thought: I see the conclusion section. I will ask the LLM to summarize it.
+Action: CodeExecution
+Action Input: print(ask_llm(f"Summarize this conclusion: {CORPUS[-2000:]}"))
+Observation: The main conclusion is that...
+Final Answer: The conclusion is...
 """
 
 class RecursiveAgent(ReActAgent):
@@ -134,3 +137,7 @@ class RecursiveAgent(ReActAgent):
 
         prompt += "\nThought:"
         return prompt
+
+    async def solve(self, question: str) -> AgentResult:
+        """Override solve to use native ReAct loop instead of OctoTools"""
+        return await self.solve_native(question)

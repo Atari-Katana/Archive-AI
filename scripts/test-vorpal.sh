@@ -32,12 +32,15 @@ echo "✅ PASS: Model directory exists"
 
 # Start Vorpal container
 echo ""
-echo "[3/4] Starting Vorpal container..."
-docker-compose up -d vorpal
-
-# Wait for startup
-echo "Waiting for Vorpal to initialize (60s)..."
-sleep 60
+echo "[3/4] Ensuring Vorpal container is running..."
+if ! docker ps | grep -q vorpal; then
+    echo "Starting Vorpal..."
+    docker-compose up -d vorpal
+    echo "Waiting for Vorpal to initialize (60s)..."
+    sleep 60
+else
+    echo "Vorpal is already running."
+fi
 
 # Check VRAM usage
 echo ""
@@ -47,29 +50,44 @@ VRAM_USED_GB=$(echo "scale=2; $VRAM_USED / 1024" | bc)
 
 echo "VRAM Used: ${VRAM_USED_GB} GB"
 
-# Check if within 3-3.5GB range (allowing some overhead)
-if (( $(echo "$VRAM_USED_GB < 2.5" | bc -l) )); then
-    echo "⚠️  WARNING: VRAM usage unusually low (${VRAM_USED_GB}GB < 2.5GB)"
+# Check if within 8.0-12.0GB range (0.60 utilization on 16GB card)
+if (( $(echo "$VRAM_USED_GB < 8.0" | bc -l) )); then
+    echo "⚠️  WARNING: VRAM usage unusually low (${VRAM_USED_GB}GB < 8.0GB)"
     echo "    Model may not be loaded properly"
-elif (( $(echo "$VRAM_USED_GB > 4.0" | bc -l) )); then
-    echo "❌ FAIL: VRAM usage too high (${VRAM_USED_GB}GB > 4.0GB)"
-    echo "    Expected ~3-3.5GB, adjust GPU_MEMORY_UTILIZATION"
+elif (( $(echo "$VRAM_USED_GB > 12.0" | bc -l) )); then
+    echo "❌ FAIL: VRAM usage too high (${VRAM_USED_GB}GB > 12.0GB)"
+    echo "    Expected ~9-10GB for 0.60 utilization"
     exit 1
 else
-    echo "✅ PASS: VRAM usage within acceptable range (2.5-4.0GB)"
+    echo "✅ PASS: VRAM usage within acceptable range (8.0-12.0GB)"
 fi
 
 # Test API endpoint
 echo ""
 echo "[5/5] Testing API endpoint..."
+
+# Get available model name
+MODEL_NAME=$(curl -s http://localhost:8000/v1/models | grep -o '"id":"[^"]*"' | cut -d'"' -f4 | head -n1)
+if [ -z "$MODEL_NAME" ]; then
+    echo "⚠️  WARNING: Could not fetch model name. Defaulting to 'test' (may fail if strict)."
+    MODEL_NAME="test"
+else
+    echo "Using model: $MODEL_NAME"
+fi
+
 RESPONSE=$(curl -s -X POST http://localhost:8000/v1/completions \
   -H "Content-Type: application/json" \
-  -d '{"model": "test", "prompt": "Hello", "max_tokens": 10}' \
+  -d "{\"model\": \"$MODEL_NAME\", \"prompt\": \"Hello\", \"max_tokens\": 10}" \
   --max-time 30 || echo "ERROR")
 
 if [[ "$RESPONSE" == "ERROR" ]]; then
     echo "❌ FAIL: API did not respond"
-    docker logs vorpal --tail 50
+    CONTAINER_ID=$(docker ps -qf "name=vorpal")
+    if [ -n "$CONTAINER_ID" ]; then
+        docker logs "$CONTAINER_ID" --tail 50
+    else
+        echo "Could not find Vorpal container logs."
+    fi
     exit 1
 fi
 

@@ -23,7 +23,7 @@ services:
     build: ./vorpal
     image: archive-ai/vorpal:latest
     environment:
-      - GPU_MEMORY_UTILIZATION=${VORPAL_GPU_MEMORY_UTILIZATION:-0.60}  # ~9.6GB (Goblin on CPU now)
+      - GPU_MEMORY_UTILIZATION=0.60
       - CUDA_VISIBLE_DEVICES=0
     ports:
       - "${VORPAL_PORT:-8000}:8000"
@@ -45,7 +45,7 @@ services:
       - "--port"
       - "8000"
       - "--gpu-memory-utilization"
-      - "${VORPAL_GPU_MEMORY_UTILIZATION:-0.60}"
+      - "0.60"
       - "--max-model-len"
       - "${VORPAL_MAX_MODEL_LEN:-8192}"
 

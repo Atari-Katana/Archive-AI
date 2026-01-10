@@ -31,6 +31,9 @@ def test_recursive_agent():
         
         if response.status_code == 200:
             result = response.json()
+            if not result.get("success", True):
+                print(f"Agent Error: {result.get('error')}")
+            
             print("\n=== FINAL ANSWER ===")
             print(result["answer"])
             print("\n=== REASONING STEPS ===")

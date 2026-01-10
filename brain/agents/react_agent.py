@@ -198,6 +198,166 @@ class ReActAgent:
                 error=f"OctoTools Error: {str(e)}"
             )
 
+    def _build_prompt(self, question: str, steps: List[AgentStep], tools: str) -> str:
+        """
+        Build the prompt for the next step.
+        Can be overridden by subclasses (e.g. RecursiveAgent).
+        """
+        prompt = (
+            f"You are a helpful AI assistant with access to the following tools:\n\n{tools}\n\n"
+            "Use the following format:\n"
+            "Question: the input question you must answer\n"
+            "Thought: you should always think about what to do\n"
+            "Action: the action to take, should be one of the tool names\n"
+            "Action Input: the input to the action\n"
+            "Observation: the result of the action\n"
+            "... (this Thought/Action/Action Input/Observation can repeat N times)\n"
+            "Thought: I now know the final answer\n"
+            "Final Answer: the final answer to the original input question\n\n"
+            f"Question: {question}\n"
+        )
+        
+        for step in steps:
+            prompt += f"\nThought: {step.thought}"
+            if step.action:
+                prompt += f"\nAction: {step.action}"
+            if step.action_input:
+                prompt += f"\nAction Input: {step.action_input}"
+            if step.observation:
+                prompt += f"\nObservation: {step.observation}"
+
+        prompt += "\nThought:"
+        return prompt
+
+    async def solve_native(self, question: str) -> AgentResult:
+        """
+        Solve using the native ReAct loop (bypassing OctoTools).
+        Used by subclasses like RecursiveAgent that need custom prompts/handling.
+        """
+        import sys
+        if '/app' not in sys.path:
+            sys.path.append('/app')
+            
+        try:
+            from services.llm import llm
+        except ImportError as e:
+            return AgentResult(
+                answer="",
+                steps=[],
+                total_steps=0,
+                success=False,
+                error=f"Import Error: {e}"
+            )
+        
+        steps = []
+        tools_desc = self.tool_registry.list_tools()
+        
+        for i in range(self.MAX_STEPS):
+            # 1. Build prompt
+            prompt = self._build_prompt(question, steps, tools_desc)
+            
+            # 2. Call LLM
+            try:
+                response = await llm.chat(
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=500,
+                    stop=["Observation:"]
+                )
+                content = response["content"]
+            except Exception as e:
+                return AgentResult(
+                    answer="", steps=steps, total_steps=i, success=False,
+                    error=f"LLM Error: {str(e)}"
+                )
+
+            # 3. Parse output
+            thought = ""
+            action = ""
+            action_input = ""
+            final_answer = ""
+            
+            # Extract Thought
+            # The prompt ends with "Thought:", so the model output usually starts with the thought text.
+            # However, sometimes it might repeat "Thought:" or start with a newline.
+            
+            clean_content = content.strip()
+            logger.info(f"DEBUG: Raw LLM Output:\n{clean_content}\n-------------------")
+            
+            # Helper to extract text before a keyword
+            def get_text_before(text, keyword):
+                if keyword in text:
+                    return text.split(keyword)[0].strip()
+                return text
+            
+            if "Final Answer:" in clean_content:
+                # If Final Answer is present, it might be the only thing or after Thought
+                if "Thought:" in clean_content:
+                    thought_part = clean_content.split("Thought:")[-1]
+                    thought = thought_part.split("Final Answer:")[0].strip()
+                else:
+                    # no "Thought:" tag, assume everything before Final Answer is thought (or empty if it starts with FA)
+                    thought = clean_content.split("Final Answer:")[0].strip()
+                
+                final_answer = clean_content.split("Final Answer:")[-1].strip()
+                steps.append(AgentStep(thought=thought, step_number=i+1))
+                return AgentResult(
+                    answer=final_answer,
+                    steps=steps,
+                    total_steps=len(steps),
+                    success=True
+                )
+
+            if "Action:" in clean_content:
+                if "Thought:" in clean_content:
+                    thought = clean_content.split("Thought:")[-1].split("Action:")[0].strip()
+                else:
+                    # Assume everything before Action is thought
+                    thought = clean_content.split("Action:")[0].strip()
+                
+                if "Action Input:" in clean_content:
+                    action_part = clean_content.split("Action:")[-1]
+                    action = action_part.split("Action Input:")[0].strip()
+                    action_input = action_part.split("Action Input:")[-1].strip()
+            else:
+                # No Action, maybe just thought?
+                if "Thought:" in clean_content:
+                    thought = clean_content.split("Thought:")[-1].strip()
+                else:
+                    thought = clean_content.strip()
+            
+            # 4. Execute Action
+            if action and action_input:
+                tool = self.tool_registry.get_tool(action)
+                if tool:
+                    try:
+                        if asyncio.iscoroutinefunction(tool):
+                            observation = await tool(action_input)
+                        else:
+                            observation = await asyncio.to_thread(tool, action_input)
+                    except Exception as e:
+                        observation = f"Tool Error: {str(e)}"
+                else:
+                    observation = f"Error: Tool '{action}' not found. Available tools: {', '.join(self.tool_registry.tools.keys())}"
+                
+                steps.append(AgentStep(
+                    thought=thought,
+                    action=action,
+                    action_input=action_input,
+                    observation=str(observation),
+                    step_number=i+1
+                ))
+            else:
+                # Model didn't produce an action - maybe just thinking or confused
+                if not final_answer:
+                    steps.append(AgentStep(thought=thought, step_number=i+1, observation="Error: No Action or Final Answer provided."))
+            
+        return AgentResult(
+            answer="Max steps reached without final answer.",
+            steps=steps,
+            total_steps=self.MAX_STEPS,
+            success=False
+        )
+
 # Convenience function for one-off agent tasks
 async def solve_with_react(
     question: str,
