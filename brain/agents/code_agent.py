@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 from dataclasses import dataclass
 
 from config import config
-from brain.services.llm import llm
+from services.llm import llm
 
 
 @dataclass

@@ -5,7 +5,7 @@
         {
           "name": "vorpal-key",
           "value": "dummy-key",
-          "models": ["/models/Meta-Llama-3.1-8B-Instruct-AWQ-INT4", "Qwen/Qwen2.5-7B-Instruct-AWQ", "Qwen/Qwen2.5-3B-Instruct"],
+          "models": ["vorpal-model"],
           "weight": 1.0
         }
       ],

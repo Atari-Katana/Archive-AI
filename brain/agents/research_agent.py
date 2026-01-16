@@ -8,8 +8,8 @@ from typing import List, Dict, Any, Optional
 from dataclasses import dataclass
 
 from config import config
-from brain.services.llm import llm
-from brain.tools.library_search import get_library_search_tool
+from services.llm import llm
+from tools.library_search import get_library_search_tool
 
 
 @dataclass
@@ -118,7 +118,7 @@ async def research_query(
                 # Use internal memory search if available or keep HTTP for now if memory logic is complex
                 # For consistency with library search optimization, we should use vector_store directly
                 # assuming it's initialized
-                from brain.memory.vector_store import vector_store
+                from memory.vector_store import vector_store
                 
                 # Ensure connected
                 if not vector_store.client:

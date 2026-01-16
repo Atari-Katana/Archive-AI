@@ -11,7 +11,7 @@ Process:
 
 from typing import List, Dict, Optional
 from config import config
-from brain.services.llm import llm
+from services.llm import llm
 
 
 class ChainOfVerification:

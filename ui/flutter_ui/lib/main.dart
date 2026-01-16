@@ -45,6 +45,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isRecording = false;
+  bool _isVoiceMode = false; // Toggle state
   String? _recordingPath;
 
   // Configuration
@@ -102,6 +103,11 @@ class _ChatScreenState extends State<ChatScreen> {
             });
             _isLoading = false;
           });
+          
+          // Auto-play if Voice Mode is active
+          if (_isVoiceMode) {
+            _speakText(agentResponse);
+          }
         }
       } else {
         if (mounted) {
@@ -268,6 +274,21 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: AppBar(
         title: const Text('Archive-AI Client'),
         backgroundColor: Colors.deepPurple.shade100,
+        actions: [
+          Row(
+            children: [
+              const Text("Voice Mode", style: TextStyle(fontSize: 12)),
+              Switch(
+                value: _isVoiceMode,
+                onChanged: (value) {
+                  setState(() {
+                    _isVoiceMode = value;
+                  });
+                },
+              ),
+            ],
+          ),
+        ],
       ),
       body: Column(
         children: <Widget>[

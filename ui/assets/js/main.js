@@ -1,8 +1,9 @@
-const API_BASE = 'http://localhost:8081';
+const API_BASE = `http://${window.location.hostname}:8081`;
 let currentMode = 'chat';
 let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
+let isVoiceMode = false; // Track voice mode state
 
 // Configure Marked.js with Highlight.js
 if (typeof marked !== 'undefined') {
@@ -14,6 +15,23 @@ if (typeof marked !== 'undefined') {
         langPrefix: 'hljs language-',
         breaks: true,
         gfm: true
+    });
+}
+
+// Voice Mode Toggle
+const voiceModeToggle = document.getElementById('voiceModeToggle');
+if (voiceModeToggle) {
+    voiceModeToggle.addEventListener('change', (e) => {
+        isVoiceMode = e.target.checked;
+        if (isVoiceMode) {
+            document.body.classList.add('voice-mode-active');
+            // Check for audio context permission early
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            const audioCtx = new AudioContext();
+            audioCtx.resume();
+        } else {
+            document.body.classList.remove('voice-mode-active');
+        }
     });
 }
 
@@ -359,12 +377,29 @@ async function sendMessage() {
             }
         }
 
+        let responseText = "";
+        let responseMsgDiv = null;
+
         if (currentMode === 'chat') {
-            chatContainer.appendChild(createMessage(data.response, 'agent', data.engine));
+            responseText = data.response;
+            responseMsgDiv = createMessage(data.response, 'agent', data.engine);
+            chatContainer.appendChild(responseMsgDiv);
         } else if (currentMode === 'verify') {
-            chatContainer.appendChild(createMessage(data.final_response, 'agent', data.engine));
+            responseText = data.final_response;
+            responseMsgDiv = createMessage(data.final_response, 'agent', data.engine);
+            chatContainer.appendChild(responseMsgDiv);
         } else {
-            chatContainer.appendChild(createAgentMessage(data.answer || 'Task completed!', data));
+            responseText = data.answer || 'Task completed!';
+            responseMsgDiv = createAgentMessage(responseText, data);
+            chatContainer.appendChild(responseMsgDiv);
+        }
+
+        // Auto-Speak if Voice Mode is active
+        if (isVoiceMode && responseText && responseMsgDiv) {
+            // Strip markdown/code blocks for TTS? 
+            // Currently TTS reads raw text, which might be verbose for code.
+            // Simple heuristic: read everything.
+            speakText(responseText, responseMsgDiv);
         }
 
     } catch (error) {

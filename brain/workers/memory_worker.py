@@ -13,7 +13,7 @@ import logging
 
 from config import config
 from memory.vector_store import VectorStore
-from brain.services.llm import llm
+from services.llm import llm
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,6 @@
+[submodule "octotools_repo"]
+	path = octotools_repo
+	url = https://github.com/octotools/octotools.git
+[submodule "Vorpal_Engine"]
+	path = Vorpal_Engine
+	url = https://github.com/Atari-Katana/Vorpal_Engine.git

@@ -121,16 +121,12 @@ class ReActAgent:
 
     async def solve(self, question: str) -> AgentResult:
         """
-        Solve a question using OctoTools.
+        Solve a question using OctoTools (primary) or Native ReAct (fallback).
         """
+        # Fallback to native implementation if OctoTools is missing
         if construct_solver is None:
-            return AgentResult(
-                answer="",
-                steps=[],
-                total_steps=0,
-                success=False,
-                error="OctoTools framework not available."
-            )
+            logger.warning("OctoTools not available. Falling back to native ReAct loop.")
+            return await self.solve_native(question)
 
         try:
             # Run OctoTools in a thread since it is synchronous
@@ -145,17 +141,15 @@ class ReActAgent:
 
             json_data = await asyncio.to_thread(run_octotools)
             
+            # Log raw output for debugging
+            logger.info(f"OctoTools Raw Output: {json_data}")
+            
             final_answer = json_data.get("final_output") or json_data.get("direct_output") or json_data.get("base_response") or "No answer generated."
             memory = json_data.get("memory", [])
             
             steps = []
             for i, action in enumerate(memory):
                 # OctoTools Memory Action structure check needed.
-                # Assuming it has dict-like access or object attributes
-                # In solver.py: self.memory.add_action(...)
-                # In memory.py (which I haven't seen but inferred):
-                
-                # Check if action is dict or object
                 if isinstance(action, dict):
                     thought = action.get('sub_goal') or action.get('thought', '')
                     tool = action.get('tool', '')
@@ -177,6 +171,13 @@ class ReActAgent:
                 )
                 steps.append(step)
             
+            # Heuristic: If answer is trivial (e.g. "done!", "finished") and we have steps,
+            # append the last observation to be more helpful.
+            if len(final_answer) < 20 and steps:
+                last_obs = steps[-1].observation
+                if last_obs and len(last_obs) > 20:
+                    final_answer += f"\n\n**Result:**\n{last_obs}"
+            
             result = AgentResult(
                 answer=final_answer,
                 steps=steps,
@@ -188,15 +189,8 @@ class ReActAgent:
             return result
 
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return AgentResult(
-                answer="",
-                steps=[],
-                total_steps=0,
-                success=False,
-                error=f"OctoTools Error: {str(e)}"
-            )
+            logger.exception("OctoTools Error, falling back to native:")
+            return await self.solve_native(question)
 
     def _build_prompt(self, question: str, steps: List[AgentStep], tools: str) -> str:
         """
