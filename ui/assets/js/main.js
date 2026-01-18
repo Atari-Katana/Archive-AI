@@ -1,797 +1,337 @@
-const API_BASE = `http://${window.location.hostname}:8081`;
-let currentMode = 'chat';
+// --- Smart API Base Detection ---
+const getApiBase = () => {
+    const { protocol, hostname, port } = window.location;
+    
+    // The Brain (Orchestrator) is on Port 8080
+    if (port === '8888') {
+        return `http://${hostname}:8080`;
+    }
+    
+    // For Cloudflare/Public domain, assume port 8080 is the primary Brain entry point
+    return `${protocol}//${hostname}:8080`;
+};
+
+const API_BASE = getApiBase();
+console.log("Archive Portal linked to Brain:", API_BASE);
+let isThinking = false;
 let mediaRecorder = null;
 let audioChunks = [];
-let isRecording = false;
-let isVoiceMode = false; // Track voice mode state
 
-// Configure Marked.js with Highlight.js
-if (typeof marked !== 'undefined') {
-    marked.setOptions({
-        highlight: function(code, lang) {
-            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-            return hljs.highlight(code, { language }).value;
-        },
-        langPrefix: 'hljs language-',
-        breaks: true,
-        gfm: true
-    });
-}
-
-// Voice Mode Toggle
-const voiceModeToggle = document.getElementById('voiceModeToggle');
-if (voiceModeToggle) {
-    voiceModeToggle.addEventListener('change', (e) => {
-        isVoiceMode = e.target.checked;
-        if (isVoiceMode) {
-            document.body.classList.add('voice-mode-active');
-            // Check for audio context permission early
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            const audioCtx = new AudioContext();
-            audioCtx.resume();
-        } else {
-            document.body.classList.remove('voice-mode-active');
-        }
-    });
-}
-
-// Fetch and display system status
-async function updateSystemStatus() {
-    try {
-        // Fetch config for model name
-        const configResp = await fetch(`${API_BASE}/config`);
-        if (configResp.ok) {
-            const data = await configResp.json();
-            const modelName = data.config.vorpal_model || 'Unknown';
-            const cleanName = modelName.split('/').pop();
-            document.getElementById('modelStatus').textContent = cleanName;
-        }
-
-        // Fetch metrics for VRAM/RAM/Speed
-        const metricsResp = await fetch(`${API_BASE}/metrics`);
-        if (metricsResp.ok) {
-            const metrics = await metricsResp.json();
-            
-            // System Memory (RAM) - Convert MB to GB
-            if (metrics.system) {
-                const ramUsed = (metrics.system.memory_used_mb / 1024).toFixed(1);
-                const ramTotal = (metrics.system.memory_total_mb / 1024).toFixed(1);
-                document.getElementById('ramStatus').textContent = `${ramUsed} / ${ramTotal} GB`;
-
-                // GPU Memory (VRAM)
-                // Backend might return null if running in container without GPU visibility
-                if (metrics.system.gpu_memory_used_mb !== null && metrics.system.gpu_memory_total_mb !== null) {
-                    const vramUsed = (metrics.system.gpu_memory_used_mb / 1024).toFixed(1);
-                    const vramTotal = (metrics.system.gpu_memory_total_mb / 1024).toFixed(1);
-                    document.getElementById('vramStatus').textContent = `${vramUsed} / ${vramTotal} GB`;
-                } else {
-                    document.getElementById('vramStatus').textContent = "-- / -- GB";
-                }
-
-                // Token Speed
-                // Backend provides a global tokens_per_sec
-                const tps = metrics.system.tokens_per_sec ? metrics.system.tokens_per_sec.toFixed(1) : '--';
-                
-                // For now, assign the same speed to Vorpal as it's the primary engine
-                document.getElementById('vorpalSpeed').textContent = `${tps} t/s`;
-                // Goblin speed isn't tracked separately in current metrics
-                document.getElementById('goblinSpeed').textContent = `-- t/s`;
-            }
-        }
-
-    } catch (error) {
-        console.error('Failed to fetch status:', error);
-        document.getElementById('modelStatus').textContent = 'Offline';
-    }
-}
-
-// Update status every 5 seconds
-setInterval(updateSystemStatus, 5000);
-
-// Initial status check
-updateSystemStatus();
-
-// DOM elements
+// DOM Elements
 const chatContainer = document.getElementById('chatContainer');
 const userInput = document.getElementById('userInput');
 const sendBtn = document.getElementById('sendBtn');
-const toolUsageDiv = document.getElementById('toolUsage');
-const modeBtns = document.querySelectorAll('.mode-btn');
+const app = document.getElementById('app');
+const clock = document.getElementById('clock');
+const personaSelect = document.getElementById('personaSelect');
+const personaPortrait = document.getElementById('personaPortrait');
+const agentSelect = document.getElementById('agentSelect');
+const configDrawer = document.getElementById('configDrawer');
+const studioModal = document.getElementById('studioModal');
 
-// Mode selection
-modeBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-        currentMode = btn.dataset.mode;
-        modeBtns.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        const modeNames = {
-            'chat': 'Chat',
-            'verify': 'Verified',
-            'agent': 'Basic Agent',
-            'advanced': 'Advanced'
-        };
-        document.getElementById('currentMode').textContent = modeNames[currentMode];
-    });
-});
+// Stats Elements
+const statTPS = document.getElementById('statTPS');
+const statVRAM = document.getElementById('statVRAM');
+const statRAM = document.getElementById('statRAM');
+const statDevice = document.getElementById('statDevice');
+const loadingOverlay = document.getElementById('loadingOverlay');
+const loadingStatus = document.getElementById('loadingStatus');
+const loadingBar = document.getElementById('loadingBar');
 
-// Input handlers
-userInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') sendMessage();
-});
-sendBtn.addEventListener('click', sendMessage);
+// Clock Hands
+const hourHand = document.getElementById('hourHand');
+const minHand = document.getElementById('minHand');
 
-// Quick actions
-document.getElementById('timeBtn').addEventListener('click', () => {
-    userInput.value = 'What is the current date and time?';
-    sendMessage();
-});
-
-document.getElementById('calcBtn').addEventListener('click', () => {
-    userInput.value = 'Calculate 123 * 456';
-    sendMessage();
-});
-
-document.getElementById('clearBtn').addEventListener('click', () => {
-    chatContainer.textContent = '';
-    const sysMsg = createMessage('Chat cleared. Start a new conversation!', 'system');
-    chatContainer.appendChild(sysMsg);
-    toolUsageDiv.textContent = '';
-    const chip = document.createElement('span');
-    chip.className = 'tool-chip';
-    chip.textContent = 'No tools used';
-    toolUsageDiv.appendChild(chip);
-});
-
-function createMessage(content, type, engine = null) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message message-${type}`;
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
+// --- Clock Logic ---
+function updateClock() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
     
-    // Render Markdown if available, otherwise use plain text
-    if (typeof marked !== 'undefined') {
-        contentDiv.innerHTML = marked.parse(content);
+    const hDeg = (hours % 12) * 30 + minutes * 0.5;
+    const mDeg = minutes * 6;
+
+    hourHand.setAttribute('transform', `rotate(${hDeg}, 50, 50)`);
+    minHand.setAttribute('transform', `rotate(${mDeg}, 50, 50)`);
+    
+    if (isThinking) {
+        clock.classList.add('thinking');
     } else {
-        contentDiv.textContent = content;
+        clock.classList.remove('thinking');
     }
-
-    msgDiv.appendChild(contentDiv);
-
-    // Add speaker button and engine badge for agent messages
-    if (type === 'agent') {
-        const controlsDiv = document.createElement('div');
-        controlsDiv.className = 'message-controls';
-        
-        // Engine Badge
-        if (engine) {
-            const badge = document.createElement('span');
-            badge.className = 'engine-badge';
-            // Clean up engine name (e.g., "bifrost:vorpal/..." -> "vorpal")
-            let engineName = engine;
-            if (engineName.includes(':')) {
-                engineName = engineName.split(':')[1];
-            }
-            if (engineName.includes('/')) {
-                engineName = engineName.split('/')[0];
-            }
-            badge.textContent = `⚙️ ${engineName}`;
-            badge.title = `Generated by ${engine}`;
-            controlsDiv.appendChild(badge);
-        }
-
-        // Speaker Button
-        const speakerBtn = document.createElement('button');
-        speakerBtn.className = 'speaker-btn';
-        speakerBtn.textContent = '🔊';
-        speakerBtn.title = 'Play as audio';
-        speakerBtn.onclick = () => speakText(content, msgDiv);
-        controlsDiv.appendChild(speakerBtn);
-        
-        msgDiv.appendChild(controlsDiv);
-    }
-
-    return msgDiv;
 }
 
-function createAgentMessage(response, data) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = 'message message-agent';
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    
-    // Render Markdown if available
-    if (typeof marked !== 'undefined') {
-        contentDiv.innerHTML = marked.parse(response);
-    } else {
-        contentDiv.textContent = response;
-    }
-    
-    msgDiv.appendChild(contentDiv);
-
-    if (data.steps && data.steps.length > 0) {
-        const stepsDiv = document.createElement('div');
-        stepsDiv.className = 'reasoning-steps';
+// --- Metrics Polling ---
+async function fetchMetrics() {
+    try {
+        const res = await fetch(`${API_BASE}/metrics`);
+        if (!res.ok) return;
+        const data = await res.json();
         
-        const title = document.createElement('strong');
-        title.textContent = 'Reasoning Process:';
-        stepsDiv.appendChild(title);
+        if (data.system) {
+            statTPS.textContent = (data.system.tokens_per_sec || 0).toFixed(1);
+            statVRAM.textContent = `${Math.round(data.system.gpu_memory_percent || 0)}%`;
+            statRAM.textContent = `${Math.round(data.system.memory_percent || 0)}%`;
+            statDevice.textContent = data.system.device || "--";
 
-        const toolsUsed = new Set();
-
-        data.steps.forEach(step => {
-            const stepDiv = document.createElement('div');
-            stepDiv.className = 'step';
-
-            const header = document.createElement('div');
-            header.className = 'step-header';
-            header.textContent = `Step ${step.step_number}`;
-            stepDiv.appendChild(header);
-
-            const thought = document.createElement('div');
-            thought.className = 'step-detail';
-            const thoughtLabel = document.createElement('span');
-            thoughtLabel.className = 'step-label';
-            thoughtLabel.textContent = 'Thought: ';
-            thought.appendChild(thoughtLabel);
-            thought.appendChild(document.createTextNode(step.thought));
-            stepDiv.appendChild(thought);
-
-            if (step.action && step.action !== 'Final Answer') {
-                const action = document.createElement('div');
-                action.className = 'step-detail';
-                const actionLabel = document.createElement('span');
-                actionLabel.className = 'step-label';
-                actionLabel.textContent = 'Action: ';
-                action.appendChild(actionLabel);
-                action.appendChild(document.createTextNode(step.action));
+            // Handle Loading Overlay
+            const status = data.system.loading_status || "Ready";
+            if (status !== "Ready") {
+                loadingOverlay.style.display = "flex";
+                loadingStatus.textContent = status.toUpperCase();
                 
-                const badge = document.createElement('span');
-                badge.className = 'tool-badge';
-                badge.textContent = step.action;
-                action.appendChild(badge);
-                
-                stepDiv.appendChild(action);
-                toolsUsed.add(step.action);
+                // Heuristic for progress bar
+                if (status.includes("Downloading")) loadingBar.style.width = "40%";
+                else if (status.includes("Scanning")) loadingBar.style.width = "60%";
+                else if (status.includes("Mapping")) loadingBar.style.width = "85%";
+                else loadingBar.style.width = "20%";
+            } else {
+                loadingOverlay.style.display = "none";
             }
+        }
 
-            if (step.action_input) {
-                const input = document.createElement('div');
-                input.className = 'step-detail';
-                const inputLabel = document.createElement('span');
-                inputLabel.className = 'step-label';
-                inputLabel.textContent = 'Input: ';
-                input.appendChild(inputLabel);
-                input.appendChild(document.createTextNode(step.action_input));
-                stepDiv.appendChild(input);
-            }
+        // Display Service Connectivity Status
+        if (data.services) {
+            data.services.forEach(s => {
+                const el = document.getElementById(`status-${s.name}`);
+                if (el) {
+                    el.textContent = s.status.toUpperCase();
+                    el.style.color = s.status === 'healthy' ? '#76c7b7' : '#ff4a4a';
+                    el.style.fontWeight = 'bold';
+                }
+            });
+        }
+    } catch (e) { console.warn("Inference Core initializing..."); }
+}
 
-            if (step.observation) {
-                const obs = document.createElement('div');
-                obs.className = 'step-detail';
-                const obsLabel = document.createElement('span');
-                obsLabel.className = 'step-label';
-                obsLabel.textContent = 'Result: ';
-                obs.appendChild(obsLabel);
-                obs.appendChild(document.createTextNode(step.observation));
-                stepDiv.appendChild(obs);
-            }
-
-            stepsDiv.appendChild(stepDiv);
+// --- Persona Management ---
+async function loadPersonas() {
+    try {
+        const res = await fetch(`${API_BASE}/personas`);
+        if (!res.ok) return;
+        const personas = await res.json();
+        
+        personaSelect.innerHTML = '';
+        personas.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = p.name;
+            opt.dataset.portrait = p.avatar_path || '';
+            opt.dataset.voice = p.voice_sample_path || '';
+            personaSelect.appendChild(opt);
         });
 
-        msgDiv.appendChild(stepsDiv);
-
-        if (toolsUsed.size > 0) {
-            updateToolUsage(Array.from(toolsUsed));
+        personaSelect.onchange = () => {
+            const selected = personaSelect.options[personaSelect.selectedIndex];
+            updatePortrait(selected.dataset.portrait);
+            // Sync with backend
+            fetch(`${API_BASE}/personas/activate/${selected.value}`, { method: 'POST' });
+        };
+        
+        if(personas.length > 0) {
+            personaSelect.selectedIndex = 0;
+            updatePortrait(personas[0].avatar_path);
         }
+
+    } catch (e) { console.error(e); }
+}
+
+function updatePortrait(url) {
+    if (url) {
+        const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`;
+        personaPortrait.innerHTML = `<img src="${fullUrl}" style="width:100%; height:100%; object-fit:cover;">`;
+    } else {
+        personaPortrait.innerHTML = `<span class="material-icons-round" style="margin: 10px;">account_circle</span>`;
     }
-
-    // Add controls
-    const controlsDiv = document.createElement('div');
-    controlsDiv.className = 'message-controls';
-
-    // Speaker Button
-    const speakerBtn = document.createElement('button');
-    speakerBtn.className = 'speaker-btn';
-    speakerBtn.textContent = '🔊';
-    speakerBtn.title = 'Play as audio';
-    speakerBtn.onclick = () => speakText(response, msgDiv);
-    controlsDiv.appendChild(speakerBtn);
-
-    msgDiv.appendChild(controlsDiv);
-
-    return msgDiv;
 }
 
-function updateToolUsage(tools) {
-    toolUsageDiv.textContent = '';
-    tools.forEach(tool => {
-        const chip = document.createElement('span');
-        chip.className = 'tool-chip';
-        chip.textContent = tool;
-        toolUsageDiv.appendChild(chip);
-    });
-}
+// --- Persona Studio ---
+document.getElementById('openStudioBtn').onclick = () => {
+    configDrawer.classList.remove('open');
+    studioModal.style.display = 'block';
+};
 
-async function sendMessage() {
-    const message = userInput.value.trim();
-    if (!message) return;
+document.getElementById('closeStudioBtn').onclick = () => {
+    studioModal.style.display = 'none';
+};
 
-    chatContainer.appendChild(createMessage(message, 'user'));
-    userInput.value = '';
+// Avatar Upload
+document.getElementById('avatarInput').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    document.getElementById('avatarPreview').textContent = file.name;
+};
 
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Thinking...';
+// Voice Recording (6 seconds)
+document.getElementById('recordVoiceBtn').onclick = async () => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaRecorder = new MediaRecorder(stream);
+        audioChunks = [];
+        
+        mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data);
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(audioChunks, { type: 'audio/wav' });
+            window.recordedVoiceBlob = blob;
+            document.getElementById('voicePreview').textContent = "Voice clip captured (6s)";
+            stream.getTracks().forEach(t => t.stop());
+        };
 
-    // Update Engine status
-    const lastEngineEl = document.getElementById('lastEngine');
-    if (lastEngineEl) {
-        lastEngineEl.textContent = 'Thinking...';
+        mediaRecorder.start();
+        document.getElementById('recordVoiceBtn').textContent = "RECORDING...";
+        document.getElementById('recordVoiceBtn').style.color = "red";
+
+        setTimeout(() => {
+            if (mediaRecorder.state === "recording") {
+                mediaRecorder.stop();
+                document.getElementById('recordVoiceBtn').textContent = "RECORD";
+                document.getElementById('recordVoiceBtn').style.color = "";
+            }
+        }, 6000);
+
+    } catch (e) { alert("Mic access denied"); }
+};
+
+document.getElementById('savePersonaBtn').onclick = async () => {
+    const name = document.getElementById('studioName').value;
+    const personality = document.getElementById('studioPersonality').value;
+    const avatarFile = document.getElementById('avatarInput').files[0];
+    const voiceBlob = window.recordedVoiceBlob;
+
+    if (!name || !personality) {
+        alert("Name and Personality are required.");
+        return;
     }
 
     try {
-        let endpoint, payload;
-        switch(currentMode) {
-            case 'chat':
-                endpoint = '/chat';
-                payload = { message };
-                break;
-            case 'verify':
-                endpoint = '/verify';
-                payload = { message };
-                break;
-            case 'agent':
-                endpoint = '/agent';
-                payload = { question: message, max_steps: 10 };
-                break;
-            case 'advanced':
-                endpoint = '/agent/advanced';
-                payload = { question: message, max_steps: 10 };
-                break;
+        let avatarPath = "";
+        let voicePath = "";
+
+        // 1. Upload Avatar
+        if (avatarFile) {
+            const fd = new FormData();
+            fd.append('file', avatarFile);
+            fd.append('type', 'image');
+            const res = await fetch(`${API_BASE}/personas/upload`, { method: 'POST', body: fd });
+            const data = await res.json();
+            avatarPath = data.path;
         }
 
-        const response = await fetch(API_BASE + endpoint, {
+        // 2. Upload Voice
+        if (voiceBlob) {
+            const fd = new FormData();
+            fd.append('file', voiceBlob, 'voice.wav');
+            fd.append('type', 'audio');
+            const res = await fetch(`${API_BASE}/personas/upload`, { method: 'POST', body: fd });
+            const data = await res.json();
+            voicePath = data.path;
+        }
+
+        // 3. Create Persona
+        const res = await fetch(`${API_BASE}/personas/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                personality,
+                avatar_path: avatarPath,
+                voice_sample_path: voicePath
+            })
+        });
+
+        if (res.ok) {
+            studioModal.style.display = 'none';
+            loadPersonas();
+            alert("Persona Initialized.");
+        }
+    } catch (e) { console.error(e); }
+};
+
+// --- Chat Logic ---
+async function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text) return;
+
+    addMessage(text, 'user');
+    userInput.value = '';
+    
+    setThinking(true);
+
+    try {
+        const mode = agentSelect.value;
+        let endpoint = "/chat";
+        let payload = { message: text };
+
+        if (mode === "basic") {
+            endpoint = "/agent/";
+            payload = { question: text };
+        } else if (mode === "advanced") {
+            endpoint = "/agent/advanced";
+            payload = { question: text };
+        } else if (mode === "recursive") {
+            endpoint = "/agent/recursive";
+            payload = { question: text, corpus: "general" }; // Default corpus
+        } else if (mode === "coder") {
+            endpoint = "/code_assist";
+            payload = { task: text };
+        }
+
+        const response = await fetch(`${API_BASE}${endpoint}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
 
         const data = await response.json();
+        setThinking(false);
 
-        // Update Last Engine status
-        if (data.engine) {
-            let engineName = data.engine;
-            // Clean up name (e.g., "bifrost:vorpal/..." -> "vorpal")
-            if (engineName.includes(':')) {
-                engineName = engineName.split(':')[1];
-            }
-            if (engineName.includes('/')) {
-                engineName = engineName.split('/')[0];
-            }
-            const lastEngineEl = document.getElementById('lastEngine');
-            if (lastEngineEl) {
-                lastEngineEl.textContent = engineName;
-            }
+        if (data.response) {
+            addMessage(data.response, 'agent', data.engine);
         }
+        
+    } catch (e) {
+        setThinking(false);
+        addMessage("CRITICAL ERROR: Archive connection severed.", 'agent');
+    }
+}
 
-        let responseText = "";
-        let responseMsgDiv = null;
+function setThinking(val) {
+    isThinking = val;
+    updateClock();
+}
 
-        if (currentMode === 'chat') {
-            responseText = data.response;
-            responseMsgDiv = createMessage(data.response, 'agent', data.engine);
-            chatContainer.appendChild(responseMsgDiv);
-        } else if (currentMode === 'verify') {
-            responseText = data.final_response;
-            responseMsgDiv = createMessage(data.final_response, 'agent', data.engine);
-            chatContainer.appendChild(responseMsgDiv);
-        } else {
-            responseText = data.answer || 'Task completed!';
-            responseMsgDiv = createAgentMessage(responseText, data);
-            chatContainer.appendChild(responseMsgDiv);
-        }
-
-        // Auto-Speak if Voice Mode is active
-        if (isVoiceMode && responseText && responseMsgDiv) {
-            // Strip markdown/code blocks for TTS? 
-            // Currently TTS reads raw text, which might be verbose for code.
-            // Simple heuristic: read everything.
-            speakText(responseText, responseMsgDiv);
-        }
-
-    } catch (error) {
-        chatContainer.appendChild(createMessage('Error: ' + error.message, 'system'));
+function addMessage(text, role, engine = "") {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${role}`;
+    
+    let html = "";
+    if (typeof marked !== 'undefined') {
+        html = marked.parse(text);
+    } else {
+        html = text;
     }
 
-    sendBtn.disabled = false;
-    sendBtn.textContent = 'Send';
+    if (role === 'agent' && engine) {
+        html += `<div style="font-size: 0.7rem; opacity: 0.5; margin-top: 10px; font-family: monospace;">CORE: ${engine.toUpperCase()}</div>`;
+    }
+
+    msgDiv.innerHTML = html;
+    chatContainer.appendChild(msgDiv);
     chatContainer.scrollTop = chatContainer.scrollHeight;
+}
+
+// --- UI Interaction ---
+document.getElementById('openConfigBtn').onclick = () => configDrawer.classList.add('open');
+document.getElementById('closeConfigBtn').onclick = () => configDrawer.classList.remove('open');
+document.getElementById('clearBtn').onclick = () => { chatContainer.innerHTML = ''; configDrawer.classList.remove('open'); };
+
+sendBtn.onclick = sendMessage;
+userInput.onkeypress = (e) => { if (e.key === 'Enter') sendMessage(); };
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateClock();
+    setInterval(updateClock, 1000);
+    setInterval(fetchMetrics, 3000); // Poll metrics
+    loadPersonas();
     userInput.focus();
-}
-
-// Voice recording functionality
-const voiceBtn = document.getElementById('voiceBtn');
-
-voiceBtn.addEventListener('click', async () => {
-    if (!isRecording) {
-        // Start recording
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-            };
-
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                await transcribeAudio(audioBlob);
-
-                // Stop all tracks
-                stream.getTracks().forEach(track => track.stop());
-            };
-
-            mediaRecorder.start();
-            isRecording = true;
-            voiceBtn.textContent = '⏹️';
-            voiceBtn.title = 'Stop recording';
-            voiceBtn.style.background = '#ef4444';
-        } catch (error) {
-            console.error('Error accessing microphone:', error);
-            alert('Could not access microphone. Please grant permission and try again.');
-        }
-    } else {
-        // Stop recording
-        mediaRecorder.stop();
-        isRecording = false;
-        voiceBtn.textContent = '🎤';
-        voiceBtn.title = 'Record voice input';
-        voiceBtn.style.background = '';
-    }
 });
-
-async function transcribeAudio(audioBlob) {
-    sendBtn.disabled = true;
-    sendBtn.textContent = 'Transcribing...';
-
-    try {
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.wav');
-
-        const response = await fetch(`${API_BASE}/voice/transcribe`, {
-            method: 'POST',
-            body: formData
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            userInput.value = data.text;
-            // Automatically send the transcribed text
-            sendMessage();
-        } else {
-            const error = await response.json();
-            chatContainer.appendChild(createMessage(`Voice transcription failed: ${error.detail}`, 'system'));
-        }
-    } catch (error) {
-        console.error('Transcription error:', error);
-        chatContainer.appendChild(createMessage(`Voice transcription error: ${error.message}`, 'system'));
-    } finally {
-        sendBtn.disabled = false;
-        sendBtn.textContent = 'Send';
-    }
-}
-
-async function speakText(text, messageElement) {
-    try {
-        // Add a loading indicator
-        const speakerBtn = messageElement.querySelector('.speaker-btn');
-        if (speakerBtn) {
-            speakerBtn.textContent = '⏳';
-            speakerBtn.disabled = true;
-        }
-
-        const response = await fetch(`${API_BASE}/voice/synthesize`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text })
-        });
-
-        if (response.ok) {
-            const audioBlob = await response.blob();
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-
-            audio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                if (speakerBtn) {
-                    speakerBtn.textContent = '🔊';
-                    speakerBtn.disabled = false;
-                }
-            };
-
-            audio.play();
-        } else {
-            const error = await response.json();
-            console.error('TTS error:', error);
-            alert(`Voice synthesis failed: ${error.detail}`);
-            if (speakerBtn) {
-                speakerBtn.textContent = '🔊';
-                speakerBtn.disabled = false;
-            }
-        }
-    } catch (error) {
-        console.error('TTS error:', error);
-        alert(`Voice synthesis error: ${error.message}`);
-    }
-}
-
-userInput.focus();
-
-/* ==========================================
-   Persona Management Logic
-   ========================================== */
-
-const personaDropdownBtn = document.getElementById('personaDropdownBtn');
-const personaDropdownList = document.getElementById('personaDropdownList');
-const openStudioBtn = document.getElementById('openStudioBtn');
-const personaModal = document.getElementById('personaModal');
-const closeModalBtn = document.getElementById('closeModalBtn');
-const personaForm = document.getElementById('personaForm');
-const personaListItems = document.getElementById('personaListItems');
-const currentPersonaName = document.getElementById('currentPersonaName');
-
-// Dropdown Toggle
-if (personaDropdownBtn) {
-    personaDropdownBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        document.querySelector('.persona-dropdown').classList.toggle('active');
-    });
-}
-
-// Close dropdown when clicking outside
-document.addEventListener('click', (e) => {
-    if (document.querySelector('.persona-dropdown') && !e.target.closest('.persona-dropdown')) {
-        document.querySelector('.persona-dropdown').classList.remove('active');
-    }
-});
-
-// Modal Controls
-if (openStudioBtn) {
-    openStudioBtn.addEventListener('click', () => {
-        openPersonaModal();
-        document.querySelector('.persona-dropdown').classList.remove('active');
-    });
-}
-
-if (closeModalBtn) {
-    closeModalBtn.addEventListener('click', () => {
-        personaModal.style.display = 'none';
-    });
-}
-
-window.addEventListener('click', (e) => {
-    if (e.target === personaModal) {
-        personaModal.style.display = 'none';
-    }
-});
-
-// Load Personas on startup
-async function loadPersonas() {
-    try {
-        const [listResp, activeResp] = await Promise.all([
-            fetch(`${API_BASE}/personas`),
-            fetch(`${API_BASE}/personas/active`)
-        ]);
-        
-        const personas = await listResp.json();
-        const activeData = await activeResp.json();
-        const activeId = activeData.active_persona_id;
-        
-        renderPersonaList(personas, activeId);
-        
-        if (activeData.persona) {
-            currentPersonaName.textContent = activeData.persona.name;
-        } else {
-            currentPersonaName.textContent = "Select Persona";
-        }
-        
-    } catch (error) {
-        console.error("Failed to load personas:", error);
-    }
-}
-
-function renderPersonaList(personas, activeId) {
-    if (!personaListItems) return;
-    personaListItems.innerHTML = '';
-    
-    if (personas.length === 0) {
-        const empty = document.createElement('div');
-        empty.className = 'dropdown-item';
-        empty.style.color = '#999';
-        empty.style.fontStyle = 'italic';
-        empty.textContent = 'No personas created';
-        personaListItems.appendChild(empty);
-        return;
-    }
-    
-    personas.forEach(persona => {
-        const item = document.createElement('div');
-        item.className = 'persona-item';
-        
-        const isActive = persona.id === activeId;
-        
-        // Use onclick attributes for simplicity in this context
-        item.innerHTML = `
-            <div class="persona-name-container" onclick="activatePersona('${persona.id}')">
-                <span class="persona-name">${persona.name}</span>
-                ${isActive ? '<span class="active-check">✓</span>' : ''}
-            </div>
-            <div class="persona-controls">
-                <span class="control-icon" title="Edit" onclick="editPersona('${persona.id}')">✏️</span>
-                <span class="control-icon" title="Delete" onclick="deletePersona('${persona.id}', '${persona.name}')">🗑️</span>
-            </div>
-        `;
-        
-        personaListItems.appendChild(item);
-    });
-}
-
-window.activatePersona = async (id) => {
-    try {
-        await fetch(`${API_BASE}/personas/activate/${id}`, { method: 'POST' });
-        loadPersonas(); // Refresh UI
-        document.querySelector('.persona-dropdown').classList.remove('active');
-        
-        // Add system message
-        const resp = await fetch(`${API_BASE}/personas/active`);
-        const data = await resp.json();
-        if (data.persona) {
-            chatContainer.appendChild(createMessage(`**System**: Activated persona **${data.persona.name}**`, 'system'));
-        }
-    } catch (error) {
-        console.error("Failed to activate persona:", error);
-    }
-}
-
-function openPersonaModal(persona = null) {
-    const title = document.getElementById('modalTitle');
-    const btn = document.getElementById('savePersonaBtn');
-    
-    // Clear form
-    if (personaForm) personaForm.reset();
-    document.getElementById('personaId').value = '';
-    document.getElementById('avatarPreview').innerHTML = '';
-    document.getElementById('voicePreview').innerHTML = '';
-    
-    if (persona) {
-        // Edit Mode
-        title.textContent = 'Edit Persona';
-        btn.textContent = 'Update Persona';
-        
-        document.getElementById('personaId').value = persona.id;
-        document.getElementById('personaName').value = persona.name;
-        document.getElementById('personaPersonality').value = persona.personality;
-        document.getElementById('personaHistory').value = persona.history || '';
-        
-        if (persona.avatar_path) {
-            document.getElementById('avatarPreview').innerHTML = 
-                `<img src="${API_BASE}/ui/${persona.avatar_path}" alt="Avatar">`;
-        }
-    } else {
-        // Create Mode
-        title.textContent = 'Persona Studio';
-        btn.textContent = 'Create Persona';
-    }
-    
-    personaModal.style.display = 'block';
-}
-
-// Edit Trigger
-window.editPersona = async (id) => {
-    const listResp = await fetch(`${API_BASE}/personas`);
-    const personas = await listResp.json();
-    const persona = personas.find(p => p.id === id);
-    if (persona) {
-        openPersonaModal(persona);
-        document.querySelector('.persona-dropdown').classList.remove('active');
-    }
-};
-
-// Delete Trigger
-window.deletePersona = async (id, name) => {
-    if (confirm(`Are you sure you want to delete ${name}?`)) {
-        try {
-            await fetch(`${API_BASE}/personas/${id}`, { method: 'DELETE' });
-            loadPersonas();
-        } catch (error) {
-            alert("Failed to delete persona");
-        }
-    }
-};
-
-// Form Submission
-if (personaForm) {
-    personaForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const btn = document.getElementById('savePersonaBtn');
-        const originalText = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = 'Saving...';
-        
-        const id = document.getElementById('personaId').value;
-        const name = document.getElementById('personaName').value;
-        const personality = document.getElementById('personaPersonality').value;
-        const history = document.getElementById('personaHistory').value;
-        const avatarFile = document.getElementById('personaAvatar').files[0];
-        const voiceFile = document.getElementById('personaVoice').files[0];
-        
-        // Upload assets first if present
-        let avatarPath = null;
-        let voicePath = null;
-        
-        try {
-            if (avatarFile) {
-                const formData = new FormData();
-                formData.append('file', avatarFile);
-                formData.append('type', 'image');
-                const resp = await fetch(`${API_BASE}/personas/upload`, { method: 'POST', body: formData });
-                if (resp.ok) {
-                    avatarPath = (await resp.json()).path;
-                }
-            }
-            
-            if (voiceFile) {
-                const formData = new FormData();
-                formData.append('file', voiceFile);
-                formData.append('type', 'audio');
-                const resp = await fetch(`${API_BASE}/personas/upload`, { method: 'POST', body: formData });
-                if (resp.ok) {
-                    voicePath = (await resp.json()).path;
-                }
-            }
-            
-            const payload = {
-                name,
-                personality,
-                history
-            };
-            
-            if (avatarPath) payload.avatar_path = avatarPath;
-            if (voicePath) payload.voice_sample_path = voicePath;
-            
-            if (id) {
-                // Update
-                await fetch(`${API_BASE}/personas/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            } else {
-                // Create
-                await fetch(`${API_BASE}/personas`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-            }
-            
-            personaModal.style.display = 'none';
-            loadPersonas();
-            
-        } catch (error) {
-            console.error("Error saving persona:", error);
-            alert("Error saving persona: " + error.message);
-        } finally {
-            btn.disabled = false;
-            btn.textContent = originalText;
-        }
-    });
-}
-
-// Initialize
-loadPersonas();

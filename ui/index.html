@@ -3,168 +3,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Archive-AI - Intelligent Agent Interface</title>
-    <link rel="stylesheet" href="assets/css/style.css">
-    <!-- Markdown & Syntax Highlighting -->
+    <title>Archive, your AI Companion</title>
+    <link rel="stylesheet" href="assets/css/style_archive.css">
+    
+    <!-- External Libs -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div class="main-panel">
-            <div class="header">
-                <div class="header-top">
-                    <h1>Archive-AI</h1>
-                    <div class="persona-dropdown">
-                        <button class="persona-btn" id="personaDropdownBtn">
-                            <span id="currentPersonaName">Select Persona</span>
-                            <span class="dropdown-arrow">▼</span>
-                        </button>
-                        <div class="dropdown-content" id="personaDropdownList">
-                            <button class="dropdown-item studio-btn" id="openStudioBtn">✨ Persona Studio</button>
-                            <div class="dropdown-separator"></div>
-                            <div id="personaListItems">
-                                <!-- Items injected by JS -->
-                            </div>
+    <div class="app-container" id="app">
+        
+        <!-- 💎 Premium Top Console -->
+        <header class="top-banner">
+            <div class="title-area">
+                <h1>Archive</h1>
+                <span style="font-size: 0.7rem; letter-spacing: 2px; opacity: 0.5;">AI COMPANION v0.2</span>
+            </div>
+
+            <!-- 🕰️ Blue Crystal Clock & Stats -->
+            <div class="clock-container">
+                <div class="crystal-clock" id="clock">
+                    <svg viewBox="0 0 100 100" class="clock-face-svg">
+                        <defs>
+                            <radialGradient id="crystalGrad" cx="30%" cy="30%" r="70%">
+                                <stop offset="0%" style="stop-color:#8ec5ff;stop-opacity:1" />
+                                <stop offset="100%" style="stop-color:#003366;stop-opacity:1" />
+                            </radialGradient>
+                        </defs>
+                        <circle cx="50" cy="50" r="45" fill="url(#crystalGrad)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                        <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(74, 163, 255, 0.2)" stroke-width="2"/>
+                        <line id="hourHand" class="hand" x1="50" y1="50" x2="50" y2="30" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                        <line id="minHand" class="hand" x1="50" y1="50" x2="50" y2="20" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                        <line id="secHand" class="hand hand-sec" x1="50" y1="50" x2="50" y2="15" stroke-linecap="round"/>
+                        <circle cx="50" cy="50" r="3" fill="white"/>
+                    </svg>
+                </div>
+
+                <!-- 📊 Live Stats -->
+                <div class="stats-display">
+                    <div class="stat-box">
+                        <span class="stat-label">TPS</span>
+                        <div style="display: flex; align-items: baseline; gap: 5px;">
+                            <span class="stat-value" id="statTPS">0.0</span>
+                            <span id="statDevice" style="font-size: 0.6rem; color: #ffcc00; font-weight: bold; letter-spacing: 1px;">--</span>
                         </div>
                     </div>
-                </div>
-                <p>Intelligent Agent with Reasoning & Tool Use</p>
-            </div>
-
-            <div class="chat-container" id="chatContainer">
-                <div class="message message-system">
-                    <div class="message-content">
-                        Welcome to Archive-AI! I can help with calculations, data analysis, time queries, and more. Try asking me something!
+                    <div class="stat-box">
+                        <span class="stat-label">VRAM</span>
+                        <span class="stat-value" id="statVRAM">0%</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">RAM</span>
+                        <span class="stat-value" id="statRAM">0%</span>
                     </div>
                 </div>
             </div>
 
-            <div class="input-container">
-                <div class="mode-selector">
-                    <button class="mode-btn active" data-mode="chat">Chat</button>
-                    <button class="mode-btn" data-mode="verify">Verified</button>
-                    <button class="mode-btn" data-mode="agent">Basic Agent</button>
-                    <button class="mode-btn" data-mode="advanced">Advanced</button>
+            <div class="header-controls">
+                <div class="control-item">
+                    <span class="control-label">Persona</span>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <div class="portrait-badge" id="personaPortrait">
+                            <span class="material-icons-round" style="margin: 10px;">account_circle</span>
+                        </div>
+                        <select id="personaSelect" class="glass-select">
+                            <option value="default">Loading...</option>
+                        </select>
+                        <button class="glass-btn" style="padding: 5px 10px;" id="playIntroBtn" title="Voice Intro">
+                            <span class="material-icons-round">volume_up</span>
+                        </button>
+                    </div>
                 </div>
+
+                <div class="control-item">
+                    <span class="control-label">Agent Mode</span>
+                    <select id="agentSelect" class="glass-select">
+                        <option value="chat">Standard Chat</option>
+                        <option value="basic">ReAct (Basic)</option>
+                        <option value="advanced">ReAct (Advanced)</option>
+                        <option value="recursive">Recursive (RLM)</option>
+                        <option value="coder">Code Assist</option>
+                    </select>
+                </div>
+
+                <button class="glass-btn" id="openConfigBtn">
+                    <span class="material-icons-round">tune</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="workspace">
+            <!-- ⏳ Loading Overlay -->
+            <div id="loadingOverlay" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(10, 26, 21, 0.95); z-index:50; flex-direction:column; align-items:center; justify-content:center; gap:30px; backdrop-filter:blur(10px);">
+                <div class="crystal-clock thinking" style="width:120px; height:120px; filter:drop-shadow(0 0 20px var(--color-crystal));">
+                    <svg viewBox="0 0 100 100" class="clock-face-svg">
+                        <circle cx="50" cy="50" r="45" fill="url(#crystalGrad)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+                        <line class="hand hand-sec" x1="50" y1="50" x2="50" y2="15" stroke-linecap="round" style="display:block; animation: rotateSec 1s linear infinite;"/>
+                    </svg>
+                </div>
+                <div style="text-align:center;">
+                    <h2 id="loadingStatus" style="color:var(--color-seafoam); letter-spacing:6px; font-weight:300; text-transform:uppercase; margin-bottom:15px;">INITIALIZING ARCHIVAL CORE</h2>
+                    <div style="width:400px; height:2px; background:rgba(255,255,255,0.1); border-radius:1px; overflow:hidden; margin: 0 auto;">
+                        <div id="loadingBar" style="width:0%; height:100%; background:var(--color-seafoam); box-shadow:0 0 20px var(--color-seafoam); transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Chat Area -->
+            <main class="chat-container" id="chatContainer">
+                <div class="message agent">
+                    Greetings. I am Archive. My processing arrays are at your disposal.
+                </div>
+            </main>
+
+            <!-- ⌨️ Floating Input Dock -->
+            <div class="input-dock">
                 <div class="input-wrapper">
-                    <input type="text" class="input-box" id="userInput" placeholder="Type your message...">
-                    <button class="voice-btn" id="voiceBtn" title="Record voice input">🎤</button>
-                    <button class="send-btn" id="sendBtn">Send</button>
+                    <button class="glass-btn" style="border:none; background:transparent;" id="voiceBtn">
+                        <span class="material-icons-round" style="color:var(--color-seafoam)">mic</span>
+                    </button>
+                    <input type="text" id="userInput" placeholder="Type your instruction..." autocomplete="off">
+                    <button class="glass-btn" id="sendBtn">
+                        <span class="material-icons-round">send</span>
+                    </button>
                 </div>
             </div>
         </div>
 
-        <div class="sidebar">
-            <div class="panel">
-                <h2>System Status</h2>
-                <div class="status-item">
-                    <span class="status-label">Brain API</span>
-                    <span class="status-value">
-                        <span class="status-indicator"></span>
-                        <span id="apiStatus">Online</span>
-                    </span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">LLM Model</span>
-                    <span class="status-value" id="modelStatus">Loading...</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Active Engine</span>
-                    <span class="status-value" id="lastEngine">--</span>
-                </div>
-                
-                <!-- Performance Meters -->
-                <div class="status-item">
-                    <span class="status-label">VRAM Usage</span>
-                    <span class="status-value" id="vramStatus">-- / -- GB</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">RAM Usage</span>
-                    <span class="status-value" id="ramStatus">-- / -- GB</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Vorpal Speed</span>
-                    <span class="status-value" id="vorpalSpeed">-- t/s</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Goblin Speed</span>
-                    <span class="status-value" id="goblinSpeed">-- t/s</span>
-                </div>
+        <!-- ⚙️ Config Drawer -->
+        <div class="config-drawer" id="configDrawer">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:30px;">
+                <h2 style="letter-spacing:2px; font-weight:300;">CONFIGURATION</h2>
+                <button class="glass-btn" style="border:none;" id="closeConfigBtn">
+                    <span class="material-icons-round">close</span>
+                </button>
+            </div>
+            
+            <!-- Persona Creator Section -->
+            <div class="menu-group" style="margin-bottom:30px;">
+                <span class="menu-label">Persona Studio</span>
+                <button class="glass-btn" style="width:100%; justify-content:center;" id="openStudioBtn">
+                    <span class="material-icons-round">edit_note</span> CREATE PERSONA
+                </button>
+            </div>
 
-                <div class="status-item">
-                    <span class="status-label">Available Tools</span>
-                    <span class="status-value">11 tools</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-label">Mode</span>
-                    <span class="status-value" id="currentMode">Chat</span>
-                </div>
-                <!-- Voice Toggle -->
-                <div class="status-item">
-                    <span class="status-label">Voice Mode</span>
-                    <label class="switch">
-                        <input type="checkbox" id="voiceModeToggle">
-                        <span class="slider round"></span>
-                    </label>
+            <!-- Service Status Section -->
+            <div class="menu-group" style="margin-bottom:30px;">
+                <span class="menu-label">Service Connectivity</span>
+                <div id="serviceStatusList" style="display:flex; flex-direction:column; gap:10px;">
+                    <div class="status-row"><span>Brain</span><span id="status-Brain" class="status-indicator">--</span></div>
+                    <div class="status-row"><span>Vorpal</span><span id="status-Vorpal" class="status-indicator">--</span></div>
+                    <div class="status-row"><span>Bolt-XL</span><span id="status-Bolt-XL" class="status-indicator">--</span></div>
+                    <div class="status-row"><span>Goblin</span><span id="status-Goblin" class="status-indicator">--</span></div>
+                    <div class="status-row"><span>Voice</span><span id="status-Voice" class="status-indicator">--</span></div>
                 </div>
             </div>
 
-            <div class="panel">
-                <h2>Recent Tools</h2>
-                <div class="tool-usage" id="toolUsage">
-                    <span class="tool-chip">No tools used</span>
-                </div>
+            <div class="control-item" style="margin-bottom:20px;">
+                <span class="control-label">Temperature</span>
+                <input type="range" min="0" max="100" value="70" class="glass-range">
             </div>
 
-            <div class="panel">
-                <h2>Quick Actions</h2>
-                <button class="action-btn" id="timeBtn">Get Current Time</button>
-                <button class="action-btn" id="calcBtn">Quick Calculation</button>
-                <button class="action-btn" id="clearBtn">Clear Chat</button>
-            </div>
+            <button class="glass-btn" style="width:100%; justify-content:center; margin-top:auto;" id="clearBtn">
+                <span class="material-icons-round">delete_sweep</span> CLEAR MEMORY
+            </button>
         </div>
-    </div>
 
-    <!-- Persona Studio Modal -->
-    <div id="personaModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Persona Studio</h2>
-                <span class="close-modal" id="closeModalBtn">&times;</span>
-            </div>
-            <form id="personaForm">
-                <input type="hidden" id="personaId">
-                <div class="form-group">
-                    <label for="personaName">Name *</label>
-                    <input type="text" id="personaName" required placeholder="e.g., Archibald Thornwick">
+        <!-- 🎭 Persona Studio Modal -->
+        <div class="modal" id="studioModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Persona Studio</h2>
+                    <span class="close-modal" id="closeStudioBtn">&times;</span>
                 </div>
                 <div class="form-group">
-                    <label for="personaPersonality">Personality (System Prompt) *</label>
-                    <textarea id="personaPersonality" rows="6" required placeholder="You are a Victorian Illustrator..."></textarea>
+                    <label>Name</label>
+                    <input type="text" id="studioName" placeholder="e.g. Victorian Librarian">
                 </div>
                 <div class="form-group">
-                    <label for="personaHistory">History / Backstory</label>
-                    <textarea id="personaHistory" rows="3" placeholder="Born in London, 1860..."></textarea>
+                    <label>Personality / Instructions</label>
+                    <textarea id="studioPersonality" rows="4" placeholder="Describe how Archive should behave..."></textarea>
                 </div>
                 <div class="form-row">
-                    <div class="form-group half-width">
-                        <label for="personaAvatar">Portrait (Image)</label>
-                        <input type="file" id="personaAvatar" accept="image/*">
-                        <div id="avatarPreview" class="file-preview"></div>
+                    <div class="half-width">
+                        <label>Portrait</label>
+                        <button class="glass-btn" style="width:100%" onclick="document.getElementById('avatarInput').click()">
+                            <span class="material-icons-round">image</span> UPLOAD
+                        </button>
+                        <input type="file" id="avatarInput" hidden accept="image/*">
+                        <div id="avatarPreview" class="file-preview">No file selected</div>
                     </div>
-                    <div class="form-group half-width">
-                        <label for="personaVoice">Voice Sample (Audio)</label>
-                        <input type="file" id="personaVoice" accept="audio/*">
-                        <div id="voicePreview" class="file-preview"></div>
+                    <div class="half-width">
+                        <label>Voice Clip (6s)</label>
+                        <button class="glass-btn" style="width:100%" id="recordVoiceBtn">
+                            <span class="material-icons-round">mic</span> RECORD
+                        </button>
+                        <input type="file" id="voiceInput" hidden accept="audio/*">
+                        <div id="voicePreview" class="file-preview">No clip recorded</div>
                     </div>
                 </div>
-                <button type="submit" class="submit-btn" id="savePersonaBtn">Create Persona</button>
-            </form>
+                <button class="submit-btn" id="savePersonaBtn">INITIALIZE PERSONA</button>
+            </div>
         </div>
     </div>
 
-    <script src="assets/js/main.js?v=7.5.1"></script>
+    <script src="assets/js/main.js?v=archive-premium-0.2"></script>
 </body>
 </html>

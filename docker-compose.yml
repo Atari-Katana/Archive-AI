@@ -18,13 +18,15 @@ services:
     networks:
       - archive-net
 
-  # 2. Engine A: Speed (Vorpal)
+  # 2. Engine A: Speed (Vorpal) - CPU-only fallback
   vorpal:
-    build: ./vorpal
-    image: archive-ai/vorpal:latest
+    image: ghcr.io/ggml-org/llama.cpp:server
     environment:
-      - GPU_MEMORY_UTILIZATION=0.60
-      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_PATH=${VORPAL_MODEL_PATH:-/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf}
+      - N_GPU_LAYERS=0
+      - CTX_SIZE=${VORPAL_CTX_SIZE:-4096}
+      - HOST=0.0.0.0
+      - PORT=8000
     ports:
       - "${VORPAL_PORT:-8000}:8000"
     volumes:
@@ -33,21 +35,27 @@ services:
       - archive-net
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+        limits:
+          memory: 8G
     command:
-      - "${VORPAL_MODEL:-Qwen/Qwen2.5-3B-Instruct}"
+      - "--model"
+      - "${VORPAL_MODEL_PATH:-/models/Llama-3.2-3B-Instruct-Q4_K_M.gguf}"
       - "--host"
       - "0.0.0.0"
       - "--port"
       - "8000"
-      - "--gpu-memory-utilization"
-      - "0.60"
-      - "--max-model-len"
-      - "${VORPAL_MAX_MODEL_LEN:-8192}"
+      - "--ctx-size"
+      - "${VORPAL_CTX_SIZE:-4096}"
+      - "--n-gpu-layers"
+      - "0"
+      - "--threads"
+      - "${VORPAL_THREADS:-8}"
+      - "--batch-size"
+      - "${VORPAL_BATCH_SIZE:-512}"
+      - "--ubatch-size"
+      - "${VORPAL_UBATCH_SIZE:-512}"
+      - "--cont-batching"
+      - "--metrics"
 
   # 3. Engine B: Capacity (Goblin) - CPU-only for reasoning/coding
   goblin:
@@ -88,6 +96,36 @@ services:
       - "--cont-batching"
       - "--metrics"
 
+  # 3b. Engine C: Bolt-XL (AutoAWQ)
+  bolt-xl:
+    build:
+      context: ./bolt-xl
+      dockerfile: Dockerfile.transformers
+    container_name: archive-bolt-xl
+    environment:
+      - BOLT_MODEL=${BOLT_MODEL:-google/gemma-2b-it}
+      - BOLT_DTYPE=${BOLT_DTYPE:-float16}
+      - HF_TOKEN=${HF_TOKEN}
+      - HF_HOME=/models/hf
+      - TRANSFORMERS_CACHE=/models/hf
+      - HUGGINGFACE_HUB_CACHE=/models/hf
+      - BOLT_MAX_NEW_TOKENS=${BOLT_MAX_NEW_TOKENS:-1024}
+    runtime: nvidia
+    ports:
+      - "${BOLT_XL_PORT:-8007}:3000"   # Host: 8007 -> Internal: 3000
+    volumes:
+      - ./models:/models
+    networks:
+      - archive-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
   # 4. The Brain (Orchestrator)
   brain:
     build: ./brain
@@ -97,27 +135,20 @@ services:
       - vorpal
     environment:
       - REDIS_URL=redis://redis:6379
-      - VORPAL_MODEL=${VORPAL_MODEL:-Qwen/Qwen2.5-3B-Instruct}
+      - VORPAL_MODEL=${VORPAL_MODEL:-Llama-3.2-3B-Instruct}
       - VORPAL_URL=http://vorpal:8000
       - GOBLIN_URL=http://goblin:8080
+      - BOLT_XL_URL=http://bolt-xl:3000
       - SANDBOX_URL=http://sandbox:8000
-      - VOICE_URL=http://voice:8001
+      - VOICE_URL=http://voice:8000
       - ASYNC_MEMORY=true  # Enabled in Chunk 2.3
-      - NVIDIA_VISIBLE_DEVICES=0  # Access for monitoring only
     ports:
-      - "${BRAIN_PORT:-8081}:8080"
+      - "${BRAIN_PORT:-8080}:8000"
     volumes:
       - ./ui:/app/ui  # Mount UI files for static serving
       - ./data:/app/data # Mount data directory for persistence
     networks:
       - archive-net
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [utility]  # utility capability for nvidia-smi
 
   # 4.5. Code Execution Sandbox
   sandbox:
@@ -134,18 +165,29 @@ services:
     build: ./voice
     image: archive-ai/voice:latest
     environment:
-      - WHISPER_MODEL=base  # tiny, base, small, medium, large
-      - WHISPER_DEVICE=cpu  # cpu or cuda
-      - WHISPER_COMPUTE_TYPE=int8  # int8, float16, float32
-      - TTS_DEVICE=cpu  # cpu or cuda
+      - WHISPER_MODEL=${WHISPER_MODEL:-base}  # tiny, base, small, medium, large
+      - WHISPER_DEVICE=${WHISPER_DEVICE:-cuda}  # cpu or cuda
+      - WHISPER_COMPUTE_TYPE=${WHISPER_COMPUTE_TYPE:-float16}  # int8, float16, float32
+      - TTS_DEVICE=${TTS_DEVICE:-cuda}  # cpu or cuda
+      - TTS_MODEL_PATH=${TTS_MODEL_PATH:-/app/models/xtts}
       - TTS_MODEL_CACHE=/models/cache
+      - NVIDIA_VISIBLE_DEVICES=0
     ports:
-      - "${VOICE_PORT:-8001}:8001"
+      - "${VOICE_PORT:-8001}:8000"
     volumes:
       - ./models/whisper:/root/.cache/huggingface  # Cache for Whisper models
       - ./models/f5-tts:/models/cache  # F5-TTS models cache
+      - ./models/xtts:/app/models/xtts  # XTTS local model files
     networks:
       - archive-net
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   # 6. Librarian Service (Library Ingestion)
   librarian:
@@ -161,8 +203,9 @@ services:
   # 7. Bifrost Gateway
   bifrost:
     image: maximhq/bifrost:latest
+    container_name: archive-bifrost
     ports:
-      - "8080:8080"
+      - "${BIFROST_PORT:-8081}:8080"
     volumes:
       - ./config/bifrost-config.json:/app/data/config.json
     networks:

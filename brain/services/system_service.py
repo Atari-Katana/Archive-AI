@@ -35,7 +35,9 @@ class SystemService:
             gpu_memory_used_mb=snapshot.gpu_memory_used_mb,
             gpu_memory_total_mb=snapshot.gpu_memory_total_mb,
             gpu_memory_percent=snapshot.gpu_memory_percent,
-            tokens_per_sec=snapshot.vorpal_tps
+            tokens_per_sec=snapshot.vorpal_tps,
+            device=snapshot.bolt_xl_device,
+            loading_status=snapshot.bolt_xl_loading
         )
 
         # Get memory statistics
@@ -58,6 +60,27 @@ class SystemService:
             url=config.VORPAL_URL
         ))
 
+        # Goblin
+        services.append(ServiceStatus(
+            name="Goblin",
+            status=snapshot.goblin_status,
+            url=config.GOBLIN_URL
+        ))
+
+        # Bolt-XL
+        services.append(ServiceStatus(
+            name="Bolt-XL",
+            status=snapshot.bolt_xl_status,
+            url=config.BOLT_XL_URL
+        ))
+
+        # Voice
+        services.append(ServiceStatus(
+            name="Voice",
+            status=snapshot.voice_status,
+            url=config.VOICE_URL
+        ))
+
         # Redis
         services.append(ServiceStatus(
             name="Redis",
@@ -71,6 +94,9 @@ class SystemService:
             status=snapshot.sandbox_status,
             url=config.SANDBOX_URL
         ))
+
+        # Set TPS to Bolt-XL TPS if available, otherwise Vorpal
+        system_metrics.tokens_per_sec = snapshot.bolt_xl_tps if snapshot.bolt_xl_tps and snapshot.bolt_xl_tps > 0 else snapshot.vorpal_tps
 
         return SystemStatusResponse(
             uptime_seconds=uptime,

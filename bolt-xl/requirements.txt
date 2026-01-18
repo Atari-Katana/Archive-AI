@@ -1,0 +1,9 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+transformers==4.41.2
+accelerate==0.33.0
+safetensors>=0.4.0
+sentencepiece>=0.1.99
+datasets>=2.20.0
+--extra-index-url https://download.pytorch.org/whl/nightly/cu128
+torch>=2.6.0.dev0

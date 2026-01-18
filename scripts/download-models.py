@@ -36,6 +36,14 @@ MODELS: Dict[str, Dict[str, any]] = {
         "sha256": None,
         "description": "14B reasoning model (Q4_K_M quantization)",
     },
+    "qwen-0.5b": {
+        "name": "Qwen2.5-0.5B-Instruct-Q4_K_M.gguf",
+        "url": "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+        "path": "models/vorpal",
+        "size": 400_000_000,  # ~400MB
+        "sha256": None,
+        "description": "Tiny 0.5B fallback model (Q4_K_M)",
+    },
 }
 
 

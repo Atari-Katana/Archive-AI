@@ -1,6 +1,7 @@
 import httpx
 import logging
 from fastapi import HTTPException
+from typing import List, Dict
 
 from config import config
 from stream_handler import stream_handler
@@ -14,76 +15,69 @@ class ChatService:
         # Capture input to Redis Stream (non-blocking, fire and forget)
         await stream_handler.capture_input(message)
 
-        # Route through Bifrost gateway
-        # Bifrost handles semantic routing to determine the appropriate model
-        # Default to vorpal, but Bifrost may override based on query complexity
-        bifrost_model = f"vorpal/{config.VORPAL_MODEL}"
-
-        logger.info(f"Routing message to Bifrost (Model: {bifrost_model})")
-
         # Get active persona prompt
         active_persona = personas_manager.get_active_persona()
         messages = []
-        
+
         if active_persona:
             system_content = active_persona.personality
             if active_persona.history:
                 system_content += f"\n\nContext/History: {active_persona.history}"
             messages.append({"role": "system", "content": system_content})
-        
+
         messages.append({"role": "user", "content": message})
 
+        # 1. Try Primary Engine: Bolt-XL
+        logger.info(f"Attempting primary engine: Bolt-XL ({config.BOLT_XL_URL})")
         try:
-            # Proxy request to Bifrost (OpenAI-compatible API)
-            async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
-                bifrost_payload = {
-                    "model": bifrost_model,
-                    "messages": messages,
-                    "max_tokens": config.MAX_TOKENS,
-                    "temperature": 0.7
-                }
+            return await self._call_engine(
+                config.BOLT_XL_URL,
+                config.BOLT_XL_MODEL,
+                messages,
+                "bolt-xl"
+            )
+        except Exception as e:
+            logger.warning(f"Bolt-XL failed: {str(e)}. Falling back to Vorpal.")
 
-                response = await client.post(
-                    f"{config.BIFROST_URL}/v1/chat/completions",
-                    json=bifrost_payload
-                )
-                response.raise_for_status()
-                result = response.json()
-                
-                # Extract response text and model info
-                completion_text = result['choices'][0]['message']['content']
-                used_model = result.get('model', bifrost_model)
+        # 2. Fallback Engine: Vorpal
+        logger.info(f"Attempting fallback engine: Vorpal ({config.VORPAL_URL})")
+        try:
+            return await self._call_engine(
+                config.VORPAL_URL,
+                config.VORPAL_MODEL,
+                messages,
+                "vorpal"
+            )
+        except Exception as e:
+            logger.error(f"Vorpal failed: {str(e)}.")
+            raise HTTPException(
+                status_code=503,
+                detail=f"All engines failed. Last error: {str(e)}"
+            )
 
-                return ChatResponse(
-                    response=completion_text,
-                    engine=f"bifrost:{used_model}"
-                )
+    async def _call_engine(self, base_url: str, model: str, messages: List[Dict[str, str]], engine_name: str) -> ChatResponse:
+        """Helper to call an OpenAI-compatible completion endpoint"""
+        async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": config.MAX_TOKENS,
+                "temperature": 0.1,
+                "top_p": 0.9
+            }
 
-        except httpx.HTTPError as e:
-            # Fallback to direct Vorpal if Bifrost fails
-            logger.warning(f"Bifrost error: {str(e)}. Falling back to direct Vorpal.")
-            try:
-                async with httpx.AsyncClient(timeout=config.REQUEST_TIMEOUT) as client:
-                    vorpal_payload = {
-                        "model": config.VORPAL_MODEL,
-                        "messages": messages,
-                        "max_tokens": config.MAX_TOKENS,
-                        "temperature": 0.7
-                    }
-                    response = await client.post(
-                        f"{config.VORPAL_URL}/v1/chat/completions",
-                        json=vorpal_payload
-                    )
-                    response.raise_for_status()
-                    result = response.json()
-                    return ChatResponse(
-                        response=result['choices'][0]['message']['content'],
-                        engine="vorpal-fallback"
-                    )
-            except Exception as ve:
-                raise HTTPException(
-                    status_code=503,
-                    detail=f"Both Bifrost and Vorpal fallback failed: {str(ve)}"
-                )
+            response = await client.post(
+                f"{base_url}/v1/chat/completions",
+                json=payload
+            )
+            response.raise_for_status()
+            result = response.json()
+
+            completion_text = result['choices'][0]['message']['content']
+
+            return ChatResponse(
+                response=completion_text,
+                engine=engine_name
+            )
 
 chat_service = ChatService()

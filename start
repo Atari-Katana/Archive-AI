@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Archive-AI Master Start Script
-# Orchestrates services, interfaces, and graceful shutdowns.
+# 🚀 Archive-AI Master Start Script
+# Orchestrates services, interfaces, and graceful shutdowns with robust fallback logic.
 #
 # Usage:
 #   ./start           # Interactive menu
@@ -13,13 +13,14 @@
 set -e
 
 # ==============================================================================
-# Configuration
+# 🎨 Configuration & Styling
 # ==============================================================================
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-COMPOSE_FILES="-f docker-compose.yml -f docker-compose.awq-7b.yml"
 WEB_UI_PORT=8888
 FLUTTER_DIR="$ROOT_DIR/ui/flutter_ui"
+BOLT_MODEL_DEFAULT="casperhansen/gemma-7b-it-awq"
+BOLT_XL_PORT_DEFAULT=8007
 
 # ANSI Colors
 RED='\033[0;31m'
@@ -27,20 +28,34 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # State tracking
 UI_PID=""
+DOCKER_COMPOSE_CMD=""
 
 # ==============================================================================
-# Helper Functions
+# 🛠️ Helper Functions
 # ==============================================================================
 
-print_header() {
-    echo -e "\n${BLUE}${BOLD}======================================================================${NC}"
-    echo -e "${BLUE}${BOLD}   $1${NC}"
-    echo -e "${BLUE}${BOLD}======================================================================${NC}\n"
+print_banner() {
+    clear
+    echo -e "${BLUE}${BOLD}"
+    echo "    ___  __  ____  __  __ __ _  _  ____     __   __  "
+    echo "   / __)(  )(_  _)(  )(  (  ( \/ )(  __)   / _\ (  ) "
+    echo "  ( (_ \ )(   )(   )( /    / )  (  ) _)   /    \ )(  "
+    echo "   \___/(__) (__) (__)\_)__)(_/\_)(____)  \_\_/(__) "
+    echo "                                                     "
+    echo -e "${NC}"
+    echo -e "${CYAN}        >>> Artificial Intelligence Archive v0.2 <<<${NC}"
+    echo -e "${BLUE}======================================================================${NC}\n"
+}
+
+print_section() {
+    echo -e "\n${MAGENTA}${BOLD}⚡ $1${NC}"
+    echo -e "${BLUE}----------------------------------------------------------------------${NC}"
 }
 
 log_info() {
@@ -59,23 +74,103 @@ log_error() {
     echo -e "${RED}[ERR]${NC}  $1"
 }
 
+load_env() {
+    if [ -f "$ROOT_DIR/.env" ]; then
+        set -a
+        . "$ROOT_DIR/.env"
+        set +a
+    fi
+}
+
+wait_for_bolt_xl() {
+    local port="$1"
+    local timeout="${2:-90}"
+    local start_time
+    start_time="$(date +%s)"
+
+    while true; do
+        if curl -fs "http://localhost:${port}/v1/models" >/dev/null 2>&1; then
+            return 0
+        fi
+        if ! docker ps --filter "name=archive-bolt-xl" --format '{{.Names}}' | grep -q .; then
+            return 1
+        fi
+        if [ $(( $(date +%s) - start_time )) -ge "$timeout" ]; then
+            return 1
+        fi
+        sleep 2
+    done
+}
+
+check_status() {
+    print_section "Service Status"
+
+    local files="-f $ROOT_DIR/docker-compose.yml"
+    if [ -n "$DOCKER_COMPOSE_CMD" ]; then
+        $DOCKER_COMPOSE_CMD $files ps
+    else
+        log_warn "Docker Compose command not available."
+    fi
+
+    print_section "Health Checks"
+    local brain_port="${BRAIN_PORT:-8080}"
+    local bolt_port="${BOLT_XL_PORT:-8007}"
+    local vorpal_port="${VORPAL_PORT:-8000}"
+
+    check_url() {
+        local name="$1"
+        local url="$2"
+        if curl -fs "$url" >/dev/null 2>&1; then
+            log_success "$name OK ($url)"
+        else
+            log_warn "$name unavailable ($url)"
+        fi
+    }
+
+    check_url "Brain API" "http://localhost:${brain_port}/health"
+    check_url "Brain UI" "http://localhost:${brain_port}/ui/"
+    check_url "Metrics UI" "http://localhost:${brain_port}/ui/metrics-panel.html"
+    check_url "Bolt-XL" "http://localhost:${bolt_port}/v1/models"
+    check_url "Vorpal" "http://localhost:${vorpal_port}/v1/models"
+}
+
+# ==============================================================================
+# 🔍 Dependency & Environment Checks
+# ==============================================================================
+
 check_dependencies() {
-    log_info "Checking system dependencies..."
+    print_section "Checking System Dependencies"
     
+    # 1. Check Docker
     if ! command -v docker &> /dev/null; then
         log_error "Docker is not installed."
         exit 1
     fi
-    
-    if ! command -v docker-compose &> /dev/null; then
-        log_error "Docker Compose is not installed."
+    log_success "Docker is installed."
+
+    # 2. Resolve Docker Compose (Fallback Logic)
+    if docker compose version &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker compose"
+        log_success "Docker Compose (Plugin v2) detected."
+    elif command -v docker-compose &> /dev/null; then
+        DOCKER_COMPOSE_CMD="docker-compose"
+        log_warn "Using legacy 'docker-compose'. Upgrade recommended for best compatibility."
+    else
+        log_error "Docker Compose not found (checked 'docker compose' and 'docker-compose')."
         exit 1
     fi
 
-    # Check for venv
+    # 3. Check NVIDIA Drivers
+    if command -v nvidia-smi &> /dev/null; then
+        log_success "NVIDIA GPU detected."
+    else
+        log_warn "No NVIDIA GPU detected (nvidia-smi not found). Models will run in CPU-only mode (slow)."
+    fi
+
+    # 4. Check Python Environment
     if [ -f "$ROOT_DIR/venv/bin/python3" ]; then
         PYTHON_CMD="$ROOT_DIR/venv/bin/python3"
-        log_info "Using virtual environment: $PYTHON_CMD"
+        log_info "Using virtual environment: venv"
     elif command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
         log_warn "Virtual environment not found. Using system python3."
@@ -83,16 +178,14 @@ check_dependencies() {
         log_error "Python3 is not installed."
         exit 1
     fi
-
-    log_success "All system dependencies met."
 }
 
 # ==============================================================================
-# Service Management
+# 🐳 Service Management
 # ==============================================================================
 
 start_services() {
-    print_header "Starting Backend Services (Docker)"
+    print_section "Starting Backend Services"
     
     # Check for models
     if [ ! -f "$ROOT_DIR/models/goblin/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf" ]; then
@@ -100,58 +193,89 @@ start_services() {
         $PYTHON_CMD "$ROOT_DIR/scripts/download-models.py" --model goblin-7b
     fi
 
-    log_info "Spinning up containers (Redis, Vorpal, Goblin, Brain, etc.)..."
-    log_info "Configuration: Dual-Engine (AWQ + 7B)"
+    log_info "Spinning up containers..."
+    
+    # COMPOSE FILES - Use primary only to avoid configuration overrides
+    FILES="-f $ROOT_DIR/docker-compose.yml"
+    
+    # Clean up stale state
+    log_info "Cleaning up stale resources..."
+    $DOCKER_COMPOSE_CMD $FILES down --remove-orphans 2>/dev/null || true
 
-    # Fix Docker Compose cache issues (ContainerConfig error)
-    log_info "Cleaning up any stale container metadata..."
-    docker-compose $COMPOSE_FILES down --remove-orphans 2>/dev/null || true
-    docker ps -a --filter "name=archive-ai" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
-
-    if docker-compose $COMPOSE_FILES up -d --build; then
-        log_success "Docker services started successfully."
+    # Start Main Services
+    log_info "Starting core services (Redis, Brain, Vorpal)..."
+    if $DOCKER_COMPOSE_CMD $FILES up -d --build redis brain vorpal; then
+        log_success "Core services started."
     else
-        log_error "Failed to start Docker services."
+        log_error "Failed to start core services."
         exit 1
     fi
 
-    log_info "Waiting for services to initialize..."
-    sleep 3
-    
-    # Quick health check
-    if curl -s http://localhost:8081/health > /dev/null; then
-        log_success "Brain API is responsive at http://localhost:8081"
+    # Start Bolt-XL (Special Handling for Fallback)
+    print_section "Starting Bolt-XL Inference Engine"
+    local bolt_model="${BOLT_MODEL:-$BOLT_MODEL_DEFAULT}"
+    local bolt_xl_port="${BOLT_XL_PORT:-$BOLT_XL_PORT_DEFAULT}"
+    local bolt_started=false
+
+    # Try standard compose first
+    if $DOCKER_COMPOSE_CMD $FILES up -d bolt-xl 2>/dev/null; then
+        if wait_for_bolt_xl "$bolt_xl_port"; then
+            log_success "Bolt-XL started via Compose."
+            bolt_started=true
+        else
+            log_warn "Bolt-XL container exited or failed to become healthy."
+        fi
     else
-        log_warn "Brain API is starting up (health check pending)..."
+        log_warn "Compose failed for Bolt-XL."
+    fi
+    if [ "$bolt_started" = false ]; then
+        log_warn "Attempting manual fallback for Bolt-XL..."
+        docker rm -f archive-bolt-xl 2>/dev/null || true
+        if docker run -d \
+            --name archive-bolt-xl \
+            --network-alias bolt-xl \
+            --gpus all \
+            -p "${bolt_xl_port}:3000" \
+            --network archive-ai_archive-net \
+            --restart unless-stopped \
+            -e BOLT_MODEL="${bolt_model}" \
+            -e BOLT_DTYPE="${BOLT_DTYPE:-float16}" \
+            -e HF_TOKEN="${HF_TOKEN:-}" \
+            -e HF_HOME="/models/hf" \
+            -e TRANSFORMERS_CACHE="/models/hf" \
+            -e HUGGINGFACE_HUB_CACHE="/models/hf" \
+            -e BOLT_MAX_NEW_TOKENS="${BOLT_MAX_NEW_TOKENS:-1024}" \
+            -v "$ROOT_DIR/models:/models" \
+            archive-ai_bolt-xl:latest; then
+            if wait_for_bolt_xl "$bolt_xl_port" 120; then
+                log_success "Bolt-XL started manually (Fallback Mode)."
+            else
+                log_error "Bolt-XL failed to start after manual fallback."
+                exit 1
+            fi
+        else
+            log_error "Failed to start Bolt-XL."
+            exit 1
+        fi
     fi
 
-    # Wait for Vorpal Engine to be ready
-    log_info "Waiting for Vorpal Engine to load model (this may take a minute)..."
-    local retries=30
-    local wait_time=2
-    local ready=false
+    # Start Remaining Services
+    log_info "Starting auxiliary services..."
+    $DOCKER_COMPOSE_CMD $FILES up -d bifrost voice sandbox librarian goblin
 
-    for ((i=1; i<=retries; i++)); do
-        # Check metrics for Vorpal status
-        if status=$(curl -s http://localhost:8081/metrics | $PYTHON_CMD -c "import sys, json; data=json.load(sys.stdin); print(next((s['status'] for s in data['services'] if s['name'] == 'Vorpal'), 'unknown'))" 2>/dev/null); then
-            if [ "$status" == "healthy" ]; then
-                log_success "Vorpal Engine is READY!"
-                ready=true
-                break
-            fi
-        fi
-        echo -ne "."
-        sleep $wait_time
-    done
-    echo ""
-
-    if [ "$ready" = false ]; then
-        log_warn "Vorpal Engine is still initializing (status: $status). It will be available shortly."
+    log_info "Waiting for initialization (5s)..."
+    sleep 5
+    
+    # Quick health check
+    if curl -s http://localhost:8080/health > /dev/null; then
+        log_success "🧠 Brain API is ONLINE at http://localhost:8080"
+    else
+        log_warn "🧠 Brain API is still initializing..."
     fi
 }
 
 stop_services() {
-    print_header "Shutdown Sequence"
+    print_section "🛑 Shutdown Sequence"
     
     if [ -n "$UI_PID" ]; then
         log_info "Stopping UI process (PID: $UI_PID)..."
@@ -159,22 +283,34 @@ stop_services() {
     fi
 
     log_info "Stopping Docker services..."
-    docker-compose $COMPOSE_FILES down
+    FILES="-f $ROOT_DIR/docker-compose.yml"
+
+    if [ -n "$DOCKER_COMPOSE_CMD" ]; then
+        $DOCKER_COMPOSE_CMD $FILES down
+    fi
     
+    # Ensure Bolt-XL is killed if running manually
+    if docker ps -q --filter "name=archive-bolt-xl" | grep -q .; then
+        log_info "Stopping manual Bolt-XL container..."
+        docker rm -f archive-bolt-xl >/dev/null 2>&1
+    fi
+
     log_success "System shutdown complete. Goodbye!"
     exit 0
 }
 
-# Trap signals for graceful shutdown
-trap stop_services SIGINT SIGTERM EXIT
-
 # ==============================================================================
-# Interface Launchers
+# 🖥️ Interface Launchers
 # ==============================================================================
 
 start_web_ui() {
-    print_header "Launching Web Interface"
+    print_section "🌐 Launching Web Interface"
     
+    # Kill any existing server on port 8888
+    log_info "Clearing port $WEB_UI_PORT..."
+    fuser -k $WEB_UI_PORT/tcp 2>/dev/null || true
+    sleep 1
+
     cd "$ROOT_DIR/ui"
     log_info "Serving Web UI on port $WEB_UI_PORT..."
     
@@ -183,15 +319,15 @@ start_web_ui() {
     UI_PID=$!
     
     log_success "Web UI is live at: http://localhost:$WEB_UI_PORT"
-    log_info "Metrics Dashboard: http://localhost:8081/ui/metrics-panel.html"
-    log_info "Config Panel:      http://localhost:8081/ui/config-panel.html"
+    echo -e "    - Metrics Dashboard: ${BLUE}http://localhost:8080/ui/metrics-panel.html${NC}"
+    echo -e "    - Config Panel:      ${BLUE}http://localhost:8080/ui/config-panel.html${NC}"
     
     # Keep script running
     wait "$UI_PID"
 }
 
 start_flutter_gui() {
-    print_header "Launching Flutter GUI"
+    print_section "📱 Launching Flutter GUI"
     
     if ! command -v flutter &> /dev/null; then
         log_error "Flutter is not installed or not in PATH."
@@ -207,21 +343,19 @@ start_flutter_gui() {
     cd "$FLUTTER_DIR"
     log_info "Running Flutter app (Linux Desktop)..."
     
-    # Start Flutter in release mode for performance, or debug if needed
     flutter run -d linux &
     UI_PID=$!
     
     log_success "Flutter application launched."
     
-    # Keep script running
     wait "$UI_PID"
 }
 
 start_headless() {
-    print_header "Headless Mode"
+    print_section "🤖 Headless Mode"
     
     log_success "Services are running in background."
-    log_info "API available at: http://localhost:8081"
+    log_info "API available at: http://localhost:8080"
     log_info "Press Ctrl+C to stop services and exit."
     
     # Infinite wait
@@ -229,40 +363,44 @@ start_headless() {
 }
 
 # ==============================================================================
-# Main Execution Flow
+# 🎬 Main Execution Flow
 # ==============================================================================
 
-# 1. Preliminaries
-check_dependencies
+# 1. Print Banner
+print_banner
 
-# 2. Argument Parsing
+# 2. Check System
+check_dependencies
+load_env
+
+# 3. Argument Parsing
 MODE=""
 case "$1" in
-    --web) MODE="web" ;; 
-    --gui) MODE="gui" ;; 
-    --api) MODE="api" ;; 
+    --web) MODE="web" ;;
+    --gui) MODE="gui" ;;
+    --api) MODE="api" ;;
+    --status) MODE="status" ;;
     --help) 
-        echo "Usage: ./start [--web | --gui | --api]"
+        echo "Usage: ./start [--web | --gui | --api | --status]"
         exit 0 
         ;; 
 esac
 
-# 3. Interactive Menu (if no arg provided)
+# 4. Interactive Menu (if no arg provided)
 if [ -z "$MODE" ]; then
-    print_header "Archive-AI Launcher"
     echo -e "Select an interface mode:"
-    echo -e "  ${BOLD}1)${NC} Web UI (Browser-based, recommended)"
-    echo -e "  ${BOLD}2)${NC} Flutter GUI (Desktop App, requires Flutter)"
-    echo -e "  ${BOLD}3)${NC} Headless (API Only)"
+    echo -e "  ${BOLD}1)${NC} 🌐 Web UI (Browser-based)"
+    echo -e "  ${BOLD}2)${NC} 📱 Flutter GUI (Desktop App)"
+    echo -e "  ${BOLD}3)${NC} 🤖 Headless (API Only)"
     echo -e "  ${BOLD}q)${NC} Quit"
     echo ""
     read -p "Enter choice [1-3]: " choice
 
     case "$choice" in
-        1) MODE="web" ;; 
-        2) MODE="gui" ;; 
-        3) MODE="api" ;; 
-        q|Q) exit 0 ;; 
+        1) MODE="web" ;;
+        2) MODE="gui" ;;
+        3) MODE="api" ;;
+        q|Q) exit 0 ;;
         *) 
             log_error "Invalid choice."
             exit 1 
@@ -270,12 +408,22 @@ if [ -z "$MODE" ]; then
     esac
 fi
 
-# 4. Start Infrastructure
+# Trap signals for graceful shutdown (avoid auto-shutdown on script exit)
+if [ "$MODE" != "status" ]; then
+    trap stop_services SIGINT SIGTERM
+fi
+
+# 5. Start Infrastructure or Status
+if [ "$MODE" = "status" ]; then
+    check_status
+    exit 0
+fi
+
 start_services
 
-# 5. Launch Selected Interface
+# 6. Launch Selected Interface
 case "$MODE" in
-    web) start_web_ui ;; 
-    gui) start_flutter_gui ;; 
-    api) start_headless ;; 
+    web) start_web_ui ;;
+    gui) start_flutter_gui ;;
+    api) start_headless ;;
 esac

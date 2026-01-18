@@ -66,7 +66,7 @@ nano .env  # Set REDIS_PASSWORD (generate with: openssl rand -base64 32)
 # Follow the interactive menu:
 # 1) Web UI (Browser) - http://localhost:8888
 # 2) Flutter GUI (Desktop)
-# 3) Headless (API Only) - http://localhost:8081
+# 3) Headless (API Only) - http://localhost:8080
 
 # 4. Verify health
 bash scripts/health-check.sh
@@ -77,19 +77,19 @@ bash scripts/health-check.sh
 - **Goblin Engine:** Qwen2.5-7B-Instruct-Q4_K_M (~4.7GB VRAM) for reasoning/general tasks
 - **Total VRAM:** ~13.2GB (fits 16GB GPU with 2.8GB headroom)
 - **Web UI:** Automatically started on port 8888
-- **Metrics Dashboard:** Real-time performance monitoring (http://localhost:8081/ui/metrics-panel.html)
-- **Config Panel:** Web-based configuration editor (http://localhost:8081/ui/config-panel.html)
+- **Metrics Dashboard:** Real-time performance monitoring (http://localhost:8080/ui/metrics-panel.html)
+- **Config Panel:** Web-based configuration editor (http://localhost:8080/ui/config-panel.html)
 
 ---
 
 ## 📊 Web Dashboards
 
 ### Main Interface
-- **URL:** http://localhost:8888 or http://localhost:8081/ui/index.html
+- **URL:** http://localhost:8888 or http://localhost:8080/ui/index.html
 - **Features:** Chat, memory browser, agent controls
 
 ### Performance Metrics Dashboard ✨ NEW
-- **URL:** http://localhost:8081/ui/metrics-panel.html
+- **URL:** http://localhost:8080/ui/metrics-panel.html
 - **Features:**
   - Real-time CPU, memory, request rate charts
   - Historical data (1-24 hours)
@@ -98,7 +98,7 @@ bash scripts/health-check.sh
   - Auto-refresh every 30 seconds
 
 ### Configuration Editor ✨ NEW
-- **URL:** http://localhost:8081/ui/config-panel.html
+- **URL:** http://localhost:8080/ui/config-panel.html
 - **Features:**
   - Live configuration editing
   - Pydantic validation
@@ -106,7 +106,7 @@ bash scripts/health-check.sh
   - Default reset capability
 
 ### API Documentation
-- **URL:** http://localhost:8081/docs
+- **URL:** http://localhost:8080/docs
 - **Features:** Swagger UI with live testing
 
 ---
@@ -126,19 +126,19 @@ bash scripts/health-check.sh
 - Goblin: CPU-only (minimal use)
 - VRAM: ~12GB total (fallback mode)
 
-See [CONFIG.md](Docs/CONFIG.md) for detailed configuration guide.
+See [CONFIG.md](docs/CONFIG.md) for detailed configuration guide.
 
 ### Microservices
 
 | Service | Purpose | Tech Stack | Port |
 |---------|---------|------------|------|
-| **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8081 |
-| **Bifrost** | Semantic Router | `maximhq/bifrost` | (Internal) |
-| **Vorpal** | Speed Engine (LLM) | vLLM + Llama-3.1-8B AWQ | 8000 |
-| **Goblin** | Reasoning Engine | llama.cpp + Qwen2.5-7B | 8082 |
+| **Brain** | Orchestrator + API | FastAPI + AsyncIO | 8080 |
+| **Bifrost** | Semantic Router | `maximhq/bifrost` | 8081 |
+| **Vorpal** | Speed Engine (LLM) | vLLM + Llama-3.1-8B AWQ | 8002 |
+| **Goblin** | Reasoning Engine | llama.cpp + Qwen2.5-7B | 8003 |
 | **Redis** | State + Vector DB | Redis Stack + RediSearch | 6379 |
-| **Voice** | Speech I/O | Faster-Whisper + F5-TTS | 8001 |
-| **Sandbox** | Code Execution | Isolated Python | 8003 |
+| **Voice** | Speech I/O | Faster-Whisper + F5-TTS | 8005 |
+| **Sandbox** | Code Execution | Isolated Python | 8004 |
 | **Librarian** | Document Ingestion | Watchdog + PyPDF2 | - |
 
 ### Data Flow
@@ -201,7 +201,7 @@ User Input → Brain → Bifrost Gateway → Vorpal/Goblin (LLM) → Surprise Sc
 - `GET /admin/archive_stats` - Archive statistics
 - `POST /admin/search_archive` - Search archived memories
 
-**Full API Docs:** http://localhost:8081/docs (Swagger UI)
+**Full API Docs:** http://localhost:8080/docs (Swagger UI)
 
 ---
 
@@ -270,7 +270,7 @@ python3 scripts/download-models.py --model goblin-7b
 REDIS_PASSWORD=<generate with: openssl rand -base64 32>
 
 # Ports
-BRAIN_PORT=8081
+BRAIN_PORT=8080
 
 # Memory Archival
 ARCHIVE_DAYS=30          # Archive after 30 days
@@ -300,7 +300,7 @@ CONFIG_UI_ENABLED=true
 ```
 
 **Advanced Tuning:**
-See [CONFIG.md](Docs/CONFIG.md) for all available options.
+See [CONFIG.md](docs/CONFIG.md) for all available options.
 
 ---
 
@@ -308,7 +308,7 @@ See [CONFIG.md](Docs/CONFIG.md) for all available options.
 
 ### Basic Chat
 ```bash
-curl -X POST http://localhost:8081/chat \
+curl -X POST http://localhost:8080/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "What is quantum computing?"}'
 ```
@@ -316,22 +316,22 @@ curl -X POST http://localhost:8081/chat \
 ### Check Metrics ✨ NEW
 ```bash
 # Current snapshot
-curl http://localhost:8081/metrics/current | jq
+curl http://localhost:8080/metrics/current | jq
 
 # Last 24 hours
-curl 'http://localhost:8081/metrics/?hours=24' | jq '.summary'
+curl 'http://localhost:8080/metrics/?hours=24' | jq '.summary'
 ```
 
 ### Update Configuration ✨ NEW
 ```bash
-curl -X POST http://localhost:8081/config/ \
+curl -X POST http://localhost:8080/config/ \
   -H "Content-Type: application/json" \
   -d '{"vorpal_url": "http://vorpal:8000", "archive_days_threshold": 60}'
 ```
 
 ### Advanced Agent with Code Execution
 ```bash
-curl -X POST http://localhost:8081/agent/advanced \
+curl -X POST http://localhost:8080/agent/advanced \
   -H "Content-Type: application/json" \
   -d '{
     "question": "Calculate factorial of 15 using code execution",
@@ -344,29 +344,29 @@ curl -X POST http://localhost:8081/agent/advanced \
 ## 📚 Documentation
 
 ### User Guides
-- **[USER_MANUAL.md](Docs/USER_MANUAL.md)** - Complete user guide
-- **[OWNERS_MANUAL.md](Docs/OWNERS_MANUAL.md)** - System administration
-- **[QUICKSTART.md](QUICKSTART.md)** - 5-minute getting started guide ✨ NEW
+- **[USER_MANUAL.md](docs/USER_MANUAL.md)** - Complete user guide
+- **[OWNERS_MANUAL.md](docs/OWNERS_MANUAL.md)** - System administration
+- **[QUICKSTART.md](docs/QUICKSTART.md)** - 5-minute getting started guide ✨ NEW
 
 ### Technical Documentation
-- **[CONFIG.md](Docs/CONFIG.md)** - Configuration guide & deployment modes
-- **[DEPLOYMENT.md](Docs/DEPLOYMENT.md)** - Production deployment guide
-- **[PERFORMANCE.md](Docs/PERFORMANCE.md)** - Performance analysis & optimization
-- **[RECURSIVE_LANGUAGE_MODEL.md](Docs/RECURSIVE_LANGUAGE_MODEL.md)** - RLM infinite context processing ✨ NEW
+- **[CONFIG.md](docs/CONFIG.md)** - Configuration guide & deployment modes
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Production deployment guide
+- **[PERFORMANCE.md](docs/PERFORMANCE.md)** - Performance analysis & optimization
+- **[RECURSIVE_LANGUAGE_MODEL.md](docs/RECURSIVE_LANGUAGE_MODEL.md)** - RLM infinite context processing ✨ NEW
 
 ### Development
-- **[Archive-AI System Atlas](Docs/Archive-AI_System_Atlas_v7.5_REVISED.md)** - Architecture spec
-- **[CLAUDE_CODE_HANDOFF.md](Docs/CLAUDE_CODE_HANDOFF.md)** - Development guidelines
-- **[PROGRESS.md](Docs/PROGRESS.md)** - Development status
-- **[COMPLETION_PLAN.md](Docs/COMPLETION_PLAN.md)** - Feature completion tracking
+- **[Archive-AI System Atlas](docs/Archive-AI_System_Atlas_v7.5_REVISED.md)** - Architecture spec
+- **[CLAUDE_CODE_HANDOFF.md](docs/CLAUDE_CODE_HANDOFF.md)** - Development guidelines
+- **[PROGRESS.md](docs/PROGRESS.md)** - Development status
+- **[COMPLETION_PLAN.md](docs/COMPLETION_PLAN.md)** - Feature completion tracking
 
 ### Test Reports ✨ NEW
-- **[FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md)** - Comprehensive integration tests
-- **[TEST_RESULTS.md](TEST_RESULTS.md)** - Initial testing results
-- **[IMPLEMENTATION_COMPLETE.md](IMPLEMENTATION_COMPLETE.md)** - Feature summary
+- **[FINAL_TEST_REPORT.md](docs/reports/FINAL_TEST_REPORT.md)** - Comprehensive integration tests
+- **[TEST_RESULTS.md](docs/reports/TEST_RESULTS.md)** - Initial testing results
+- **[IMPLEMENTATION_COMPLETE.md](docs/reports/IMPLEMENTATION_COMPLETE.md)** - Feature summary
 
 ### Checkpoints
-- **[checkpoints/](checkpoints/)** - Detailed implementation checkpoints
+- **[checkpoints/](docs/archive/checkpoints/)** - Detailed implementation checkpoints
 
 ---
 
@@ -444,7 +444,7 @@ mypy brain/
 - Collection interval: 30s
 - Success rate: 100%
 
-See [PERFORMANCE.md](Docs/PERFORMANCE.md) and [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) for detailed analysis.
+See [PERFORMANCE.md](docs/PERFORMANCE.md) and [FINAL_TEST_REPORT.md](docs/reports/FINAL_TEST_REPORT.md) for detailed analysis.
 
 ---
 
@@ -454,7 +454,7 @@ See [PERFORMANCE.md](Docs/PERFORMANCE.md) and [FINAL_TEST_REPORT.md](FINAL_TEST_
 
 1. **Network Security**
    - Internal services bound to localhost only
-   - Only Brain (port 8081) externally accessible
+   - Only Brain (port 8080) externally accessible
    - Use nginx reverse proxy with SSL
 
 2. **Firewall Configuration**
@@ -463,9 +463,9 @@ See [PERFORMANCE.md](Docs/PERFORMANCE.md) and [FINAL_TEST_REPORT.md](FINAL_TEST_
    sudo ufw allow 80/tcp    # HTTP
    sudo ufw allow 443/tcp   # HTTPS
    sudo ufw deny 6379       # Redis
-   sudo ufw deny 8000       # Vorpal
-   sudo ufw deny 8001       # Voice
-   sudo ufw deny 8003       # Sandbox
+   sudo ufw deny 8002       # Vorpal
+   sudo ufw deny 8005       # Voice
+   sudo ufw deny 8004       # Sandbox
    sudo ufw enable
    ```
 
@@ -482,7 +482,7 @@ See [PERFORMANCE.md](Docs/PERFORMANCE.md) and [FINAL_TEST_REPORT.md](FINAL_TEST_
    - Type checking on all settings
    - Restart warnings for critical changes
 
-See [DEPLOYMENT.md](Docs/DEPLOYMENT.md) for complete security guide.
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete security guide.
 
 ---
 
@@ -537,7 +537,7 @@ tar -xzf ~/backups/archive-ai/archive-YYYYMMDD_HHMMSS.tar.gz
 docker-compose logs brain
 
 # Verify ports
-sudo netstat -tulpn | grep -E .8081|6379|8000'
+sudo netstat -tulpn | grep -E .8080|6379|8002'
 
 # Check GPU
 nvidia-smi
@@ -546,7 +546,7 @@ nvidia-smi
 **405 Method Not Allowed:**
 - **Fixed in v7.5:** Static files now mounted at /ui
 - Update UI URLs to use /ui/ prefix
-- See [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) for details
+- See [FINAL_TEST_REPORT.md](docs/reports/FINAL_TEST_REPORT.md) for details
 
 **Import Errors:**
 - **Fixed in v7.5:** Correct import paths for Docker container
@@ -559,10 +559,10 @@ nvidia-smi
 docker exec archive-redis redis-cli INFO memory
 
 # Trigger manual archival
-curl -X POST http://localhost:8081/admin/archive_old_memories
+curl -X POST http://localhost:8080/admin/archive_old_memories
 
 # Check metrics
-curl http://localhost:8081/metrics/current | jq
+curl http://localhost:8080/metrics/current | jq
 ```
 
 ---
@@ -614,8 +614,8 @@ MIT License
 ## 🤝 Support
 
 - **Issues:** https://github.com/yourusername/archive-ai/issues
-- **Documentation:** See [Docs/](Docs/) directory
-- **Checkpoints:** See [checkpoints/](checkpoints/) directory
+- **Documentation:** See [docs/](docs/) directory
+- **Checkpoints:** See [docs/archive/checkpoints/](docs/archive/checkpoints/) directory
 
 ---
 
@@ -627,12 +627,12 @@ MIT License
 ```
 
 **Access Points:**
-- **Main UI:** http://localhost:8888 or http://localhost:8081/ui/
-- **Metrics Dashboard:** http://localhost:8081/ui/metrics-panel.html ✨
-- **Config Editor:** http://localhost:8081/ui/config-panel.html ✨
-- **API Docs:** http://localhost:8081/docs
-- **Health:** http://localhost:8081/health
-- **Redis Insight:** http://localhost:8002
+- **Main UI:** http://localhost:8888 or http://localhost:8080/ui/
+- **Metrics Dashboard:** http://localhost:8080/ui/metrics-panel.html ✨
+- **Config Editor:** http://localhost:8080/ui/config-panel.html ✨
+- **API Docs:** http://localhost:8080/docs
+- **Health:** http://localhost:8080/health
+- **Redis Insight:** http://localhost:8006
 
 **Essential Commands:**
 ```bash
@@ -643,11 +643,11 @@ bash scripts/run-edge-case-tests.sh  # Edge case tests ✨
 ```
 
 **Essential Docs:**
-- [QUICKSTART.md](QUICKSTART.md) - 5-minute guide ✨
-- [USER_MANUAL.md](Docs/USER_MANUAL.md) - Complete user guide
-- [CONFIG.md](Docs/CONFIG.md) - Configuration
-- [DEPLOYMENT.md](Docs/DEPLOYMENT.md) - Production setup
-- [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) - Test results ✨
+- [QUICKSTART.md](docs/QUICKSTART.md) - 5-minute guide ✨
+- [USER_MANUAL.md](docs/USER_MANUAL.md) - Complete user guide
+- [CONFIG.md](docs/CONFIG.md) - Configuration
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Production setup
+- [FINAL_TEST_REPORT.md](docs/reports/FINAL_TEST_REPORT.md) - Test results ✨
 
 ---
 
@@ -678,4 +678,4 @@ Built with Claude Code
 - Memory system storing 132+ tested memories
 - 100% test pass rate across all features
 
-**See [IMPLEMENTATION_COMPLETE.md](IMPLEMENTATION_COMPLETE.md) for full details.**
+**See [IMPLEMENTATION_COMPLETE.md](docs/reports/IMPLEMENTATION_COMPLETE.md) for full details.**

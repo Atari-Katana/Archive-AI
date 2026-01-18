@@ -62,10 +62,32 @@ class MetricsCollector:
 
         # Service health checks
         vorpal_status = "healthy" if vorpal_metrics.get("healthy") else "unhealthy"
-        # Simple health check for Goblin if we aren't parsing metrics yet
+        bolt_xl_status = await self._check_service(config.BOLT_XL_URL)
         goblin_status = await self._check_service(goblin_url)
         redis_status = "healthy" if self._check_redis() else "unhealthy"
         sandbox_status = await self._check_service(config.SANDBOX_URL)
+        voice_status = await self._check_service(config.VOICE_URL)
+
+        # Get Bolt-XL TPS and Device info from Redis
+        bolt_xl_tps = 0.0
+        bolt_xl_device = "Unknown"
+        bolt_xl_loading = "Ready"
+
+        if vector_store and vector_store.client:
+            try:
+                tps_val = vector_store.client.get("metrics:bolt_xl:tps")
+                if tps_val:
+                    bolt_xl_tps = float(tps_val)
+
+                device_val = vector_store.client.get("bolt_xl:device")
+                if device_val:
+                    bolt_xl_device = device_val.decode('utf-8') if isinstance(device_val, bytes) else str(device_val)
+
+                loading_val = vector_store.client.get("bolt_xl:loading_status")
+                if loading_val:
+                    bolt_xl_loading = loading_val.decode('utf-8') if isinstance(loading_val, bytes) else str(loading_val)
+            except:
+                pass
 
         return MetricsSnapshot(
             timestamp=time.time(),
@@ -79,11 +101,16 @@ class MetricsCollector:
             avg_latency=avg_latency,
             error_rate=error_rate,
             vorpal_status=vorpal_status,
+            bolt_xl_status=bolt_xl_status,
             goblin_status=goblin_status,
             redis_status=redis_status,
             sandbox_status=sandbox_status,
+            voice_status=voice_status,
             vorpal_tps=vorpal_metrics.get("tps"),
-            goblin_tps=goblin_metrics.get("tps")
+            bolt_xl_tps=bolt_xl_tps,
+            goblin_tps=goblin_metrics.get("tps"),
+            bolt_xl_device=bolt_xl_device,
+            bolt_xl_loading=bolt_xl_loading
         )
 
     async def _get_engine_metrics(self, url: str, engine_type: str) -> Dict[str, Any]:
@@ -98,6 +125,14 @@ class MetricsCollector:
                         result["healthy"] = True
                 except:
                     pass
+                
+                if not result["healthy"]:
+                    try:
+                        models = await client.get(f"{url}/v1/models")
+                        if models.status_code == 200:
+                            result["healthy"] = True
+                    except:
+                        pass
                 
                 # Fetch metrics
                 try:

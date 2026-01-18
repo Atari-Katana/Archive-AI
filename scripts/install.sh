@@ -252,9 +252,9 @@ echo "   Place Llama-3-8B-Instruct (EXL2 4.0bpw) in ./models/vorpal/"
 echo ""
 echo "3. Start services:"
 if [ "$PROD_MODE" = true ]; then
-    echo "   bash scripts/start.sh --prod"
+    echo "   ./start --api"
 else
-    echo "   bash scripts/start.sh"
+    echo "   ./start"
 fi
 echo ""
 echo "4. Check health:"
@@ -266,9 +266,9 @@ echo "   Open http://localhost:8888"
 echo ""
 
 print_info "Documentation:"
-echo "  - Quick Start: README.md"
-echo "  - Deployment: DEPLOYMENT.md"
-echo "  - Performance: PERFORMANCE.md"
+echo "  - Quick Start: docs/QUICKSTART.md"
+echo "  - Deployment: docs/DEPLOYMENT.md"
+echo "  - Performance: docs/PERFORMANCE.md"
 echo ""
 
 print_success "Installation ready!"

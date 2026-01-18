@@ -1,10 +1,11 @@
 #!/bin/sh
 set -e
 
-host="vorpal"
+# Default to standardized name
+host="${VORPAL_HOST:-archive-vorpal}"
 port="8000"
 
-echo "Waiting for vorpal to be ready..."
+echo "Waiting for $host to be ready..."
 
 # We will use a simple loop with nc if available, otherwise fallback to a less ideal sleep
 # Check if nc (netcat) is available

@@ -22,11 +22,12 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(na
 logger = logging.getLogger("voice")
 
 # Configuration
-WHISPER_MODEL_SIZE = os.getenv("WHISPER_MODEL", "base")
-WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cpu")
+WHISPER_MODEL = os.getenv("WHISPER_MODEL")
+WHISPER_MODEL_PATH = os.getenv("WHISPER_MODEL_PATH", WHISPER_MODEL or "/app/models/whisper")
+WHISPER_DEVICE = os.getenv("WHISPER_DEVICE", "cuda")
 WHISPER_COMPUTE_TYPE = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
-TTS_DEVICE = os.getenv("TTS_DEVICE", "cpu")
-TTS_MODEL_NAME = "tts_models/multilingual/multi-dataset/xtts_v2"
+TTS_MODEL_PATH = os.getenv("TTS_MODEL_PATH", "/app/models/xtts")
+TTS_DEVICE = os.getenv("TTS_DEVICE", "cuda")
 
 # --- Services ---
 
@@ -35,12 +36,21 @@ class STTService:
         self.model: Optional[WhisperModel] = None
 
     def load(self):
-        logger.info(f"Loading Whisper STT ({WHISPER_MODEL_SIZE} on {WHISPER_DEVICE})...")
+        device = WHISPER_DEVICE
+        compute_type = WHISPER_COMPUTE_TYPE
+        if device == "cuda" and not torch.cuda.is_available():
+            logger.warning("NVIDIA GPU requested but not available. Falling back to CPU for STT.")
+            device = "cpu"
+        if device == "cuda" and compute_type == "int8":
+            logger.warning("Whisper int8 compute is not supported on CUDA; using float16.")
+            compute_type = "float16"
+            
+        logger.info(f"Loading Whisper STT from {WHISPER_MODEL_PATH} on {device}...")
         try:
             self.model = WhisperModel(
-                WHISPER_MODEL_SIZE,
-                device=WHISPER_DEVICE,
-                compute_type=WHISPER_COMPUTE_TYPE
+                WHISPER_MODEL_PATH,
+                device=device,
+                compute_type=compute_type
             )
             logger.info("✅ Whisper STT loaded.")
         except Exception as e:
@@ -72,13 +82,28 @@ class TTSService:
         self.available = False
 
     def load(self):
-        logger.info(f"Loading Coqui XTTS-v2 ({TTS_DEVICE})...")
+        device = TTS_DEVICE
+        if device == "cuda" and not torch.cuda.is_available():
+            logger.warning("NVIDIA GPU requested but not available. Falling back to CPU for TTS.")
+            device = "cpu"
+
+        logger.info(f"Loading Coqui XTTS-v2 from {TTS_MODEL_PATH} on {device}...")
         try:
             from TTS.api import TTS
+            try:
+                from TTS.config.shared_configs import BaseDatasetConfig
+                from TTS.tts.configs.xtts_config import XttsConfig
+                from TTS.tts.models.xtts import XttsArgs, XttsAudioConfig
+                if hasattr(torch.serialization, "add_safe_globals"):
+                    torch.serialization.add_safe_globals(
+                        [BaseDatasetConfig, XttsConfig, XttsArgs, XttsAudioConfig]
+                    )
+            except Exception as e:
+                logger.warning(f"XTTS safe globals setup skipped: {e}")
             os.environ["COQUI_TOS_AGREED"] = "1"
             
-            # Initialize TTS
-            self.model = TTS(TTS_MODEL_NAME).to(TTS_DEVICE)
+            # Initialize TTS from local path
+            self.model = TTS(model_path=TTS_MODEL_PATH, config_path=os.path.join(TTS_MODEL_PATH, "config.json")).to(device)
             self.available = True
             logger.info("✅ XTTS-v2 loaded.")
         except Exception as e:
@@ -119,15 +144,27 @@ class TranscriptionResponse(BaseModel):
 
 @app.on_event("startup")
 async def startup_event():
-    stt_service.load()
-    tts_service.load()
+    # Load models in background to avoid blocking health checks
+    import asyncio
+    asyncio.create_task(load_models_async())
+
+async def load_models_async():
+    logger.info("Initializing models in background...")
+    try:
+        stt_service.load()
+        tts_service.load()
+        logger.info("🎉 All voice models loaded and ready.")
+    except Exception as e:
+        logger.error(f"Failed to load models: {e}")
 
 @app.get("/health")
 async def health_check():
+    # Healthy if the API is up, even if models are still loading
     return {
         "status": "healthy",
         "stt": {"loaded": stt_service.model is not None},
-        "tts": {"available": tts_service.available}
+        "tts": {"available": tts_service.available},
+        "initializing": stt_service.model is None or not tts_service.available
     }
 
 @app.post("/transcribe", response_model=TranscriptionResponse)
@@ -210,4 +247,4 @@ async def synthesize_endpoint(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

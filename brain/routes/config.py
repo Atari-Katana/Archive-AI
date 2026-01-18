@@ -170,7 +170,7 @@ async def get_config():
         "vorpal_url": os.getenv("VORPAL_URL", "http://vorpal:8000"),
         "goblin_url": os.getenv("GOBLIN_URL", "http://goblin:8080"),
         "sandbox_url": os.getenv("SANDBOX_URL", "http://sandbox:8000"),
-        "voice_url": os.getenv("VOICE_URL", "http://voice:8001"),
+        "voice_url": os.getenv("VOICE_URL", "http://voice:8000"),
         "redis_url": os.getenv("REDIS_URL", "redis://redis:6379"),
 
         # Feature flags
@@ -178,7 +178,7 @@ async def get_config():
         "enable_voice": os.getenv("ENABLE_VOICE", "false").lower() == "true",
 
         # Model settings
-        "vorpal_model": os.getenv("VORPAL_MODEL", "Qwen/Qwen2.5-3B-Instruct"),
+        "vorpal_model": os.getenv("VORPAL_MODEL", "Llama-3.2-3B-Instruct"),
 
         # Archive settings
         "archive_days_threshold": int(os.getenv("ARCHIVE_DAYS_THRESHOLD", "30")),

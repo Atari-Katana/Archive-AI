@@ -15,9 +15,10 @@ faster-whisper==1.1.0
 TTS==0.22.0
 # Pin transformers for Coqui compatibility
 transformers==4.36.2
-# Pin torch < 2.6 to avoid weights_only=True default breaking Coqui pickle loading
-torch==2.4.0
-torchaudio==2.4.0
+# Use PyTorch nightly CUDA wheels to support newer GPU architectures (sm_120)
+--extra-index-url https://download.pytorch.org/whl/nightly/cu128
+torch>=2.6.0.dev0
+torchaudio>=2.6.0.dev0
 numpy>=1.24.0
 
 # File handling
