@@ -19,7 +19,7 @@ set -e
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 WEB_UI_PORT=8888
 FLUTTER_DIR="$ROOT_DIR/ui/flutter_ui"
-BOLT_MODEL_DEFAULT="casperhansen/gemma-7b-it-awq"
+BOLT_MODEL_DEFAULT="google/gemma-2b-it"
 BOLT_XL_PORT_DEFAULT=8007
 
 # ANSI Colors
