@@ -80,6 +80,7 @@ bash scripts/health-check.sh
 - **Web UI:** Automatically started on port 8888
 - **Metrics Dashboard:** Real-time performance monitoring (http://localhost:8080/ui/metrics-panel.html)
 - **Config Panel:** Web-based configuration editor (http://localhost:8080/ui/config-panel.html)
+- **Operator Guides:** See `docs/guides/quickstart.md`, `docs/guides/models.md`, `docs/guides/audio.md`, `docs/guides/persona.md`, and `docs/guides/memory.md` for step-by-step instructions.
 
 ---
 
