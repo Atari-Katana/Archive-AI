@@ -16,6 +16,7 @@ Archive-AI is a self-hosted AI companion with permanent memory, dual inference e
 - **📚 Library System** - RAG ingestion for PDFs/Text with vector search
 - **Cold Storage** - Automatic memory archival to disk with tiered storage
 - **Chain of Verification** - Hallucination mitigation for trusted outputs
+- **Research & Innovation Guide** - See `docs/INNOVATIONS.md` for the research papers (OctoTools, RLM, Surprise Score, verification) that inspired the app architecture
 
 ### NEW: Production Features ✨
 - **🤖 Automated Model Downloads** - One-command setup with resume capability
